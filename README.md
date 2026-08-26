@@ -1,5 +1,27 @@
 # wacrm — CRM Template for WhatsApp
 
+> **⚙️ Commercial SaaS fork — conversion in progress.** This repository is
+> a fork of the upstream open-source [`ArnasDon/wacrm`](https://github.com/ArnasDon/wacrm)
+> template, being converted into a **hosted, India-first WhatsApp campaign
+> + shared-inbox SaaS**. It is **not launched** and is not yet a finished
+> product. The self-host / Hostinger material below is retained from
+> upstream as reference and attribution — our target production deployment
+> is **Vercel + Supabase**, not Hostinger.
+>
+> **Start here:**
+> [Conversion audit](./docs/conversion/WACRM_CONVERSION_AUDIT.md) (source of
+> truth) ·
+> [Positioning](./docs/conversion/SAAS_POSITIONING.md) ·
+> [Roadmap](./docs/conversion/ROADMAP.md) ·
+> [Milestones](./docs/conversion/MILESTONES.md) ·
+> [Decisions](./docs/decisions/README.md) ·
+> [Build state](./BUILD_STATE.md). Contributor rules: [`AGENTS.md`](./AGENTS.md).
+>
+> This fork remains **MIT-licensed**, and full credit for the base product
+> goes to the upstream WACRM project and its author.
+
+---
+
 > Self-hostable CRM template for WhatsApp® — shared inbox, contacts,
 > sales pipelines, broadcasts, and no-code automations. Fork it, brand
 > it, host it.
