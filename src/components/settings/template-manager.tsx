@@ -12,8 +12,11 @@ import {
   Pencil,
   RotateCcw,
   Upload,
+  Sparkles,
 } from 'lucide-react';
+import { AiWriterPanel } from '@/components/campaigns/ai-writer-panel';
 import { createClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
 import {
   uploadAccountMedia,
   MEDIA_MAX_BYTES_BY_KIND,
@@ -139,6 +142,8 @@ export function TemplateManager() {
   // submit handler from POST /submit to PATCH /[id] and changes the
   // dialog title + CTA. Set to the template id to pre-fill from a row.
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Reveals the AI campaign-writer panel beside the body field (M05C).
+  const [showAiWriter, setShowAiWriter] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // Template selected for the confirm-delete dialog. The destructive
   // action goes through this two-step so a slip on the trash icon
@@ -863,7 +868,36 @@ export function TemplateManager() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-muted-foreground">{t('bodyText')}</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-muted-foreground">{t('bodyText')}</Label>
+                {/* AI writer toggle — indigo AI accent (M05C). Reveals the
+                    assistant that drafts copy into this body field. */}
+                <button
+                  type="button"
+                  onClick={() => setShowAiWriter((v) => !v)}
+                  aria-pressed={showAiWriter}
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                    showAiWriter
+                      ? 'bg-ai/10 text-ai'
+                      : 'text-ai hover:bg-ai/10',
+                  )}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Write with AI
+                </button>
+              </div>
+
+              {showAiWriter && (
+                <AiWriterPanel
+                  existingDraft={form.body_text}
+                  templateCategory={form.category}
+                  onUseMessage={(text) =>
+                    setForm((prev) => ({ ...prev, body_text: text }))
+                  }
+                />
+              )}
+
               <Textarea
                 placeholder={t.raw('bodyPlaceholder')}
                 value={form.body_text}

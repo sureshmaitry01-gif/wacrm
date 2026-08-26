@@ -179,8 +179,8 @@ export default function NewBroadcastPage() {
         })}
       </div>
 
-      {/* Step Content */}
-      <div className="relative min-h-[400px]">
+      {/* Step Content — a white "cockpit" panel on the soft-gray canvas. */}
+      <div className="relative min-h-[400px] rounded-xl border border-border bg-card p-5 shadow-card sm:p-6">
         <div
           className="transition-all duration-300 ease-in-out"
           style={{

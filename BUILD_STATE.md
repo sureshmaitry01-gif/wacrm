@@ -263,8 +263,18 @@ route-contract changes. See [docs/ui/M05_UI_DIRECTION.md](docs/ui/M05_UI_DIRECTI
   data flow / realtime / send / assignment preserved. Checks: typecheck ✅,
   lint ✅ (37 warnings), test ✅ 936/92, build ✅. Commit
   `feat(m05b): premium shared inbox redesign`.
-- M05C–F (campaign wizard + AI writer UI, dashboard, billing/settings,
-  contacts/templates) — pending.
+- **M05C — campaign wizard + AI writer UI ✅**: broadcast wizard step
+  content in a white "cockpit" panel; `CampaignInsights` restructured
+  (section header, gray tiles, no-markup chip, colour-coded risk badge);
+  new **AI campaign writer panel** (indigo accent) in the template
+  composer beside the body field — en/hi/hinglish toggle, Write/Improve,
+  result preview with Use-this, and loading/402/not-configured/error
+  states. Consumes only the existing `/api/ai/campaign` (no endpoint /
+  provider / quota / billing changes; never auto-sends). Checks:
+  typecheck ✅, lint ✅ (37 warnings), test ✅ 936/92, build ✅. Commit
+  `feat(m05c): campaign wizard and ai writer ui`. Docs:
+  `docs/campaigns/AI_WRITER_UI.md`.
+- M05D–F (dashboard, billing/settings, contacts/templates) — pending.
 
 ---
 

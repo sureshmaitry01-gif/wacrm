@@ -43,8 +43,8 @@ are copied.
 | # | Scope | Status |
 |---|---|---|
 | **M05A** | Design tokens + app-shell/primitive foundation | ✅ done |
-| **M05B** | Shared inbox redesign (filters · list · thread · customer panel) | ✅ this pass |
-| M05C | Campaign wizard redesign + AI writer composer UI | ⏳ |
+| **M05B** | Shared inbox redesign (filters · list · thread · customer panel) | ✅ done |
+| **M05C** | Campaign wizard redesign + AI writer composer UI | ✅ this pass |
 | M05D | Dashboard / analytics polish (KPI cards, charts) | ⏳ |
 | M05E | Billing / settings polish | ⏳ |
 | M05F | Contacts / templates light polish | ⏳ |
@@ -98,6 +98,26 @@ by the page) is preserved. Worked in sub-steps:
   AI accent** (first real consumer of the `--ai` token — `text-ai` /
   `bg-ai-soft`); fixed the WhatsApp-not-connected banner's amber contrast
   for light mode.
+
+## M05C — what changed (campaign wizard + AI writer)
+
+Restyle + one net-new UI (the AI writer), consuming only existing M04 APIs
+— no endpoint, provider, quota, or billing changes.
+
+- **M05C-2 · wizard shell** — the broadcast wizard step content now sits in
+  a white **"cockpit" card panel** on the soft-gray canvas; emerald stepper
+  inherited from M05A.
+- **M05C-3 · insights** — `CampaignInsights` restructured into a labelled
+  "Campaign insights" section with gray tiles, a **no-markup** emerald chip,
+  and a **colour-coded risk badge** on the quality score. Still read-only /
+  deterministic.
+- **M05C-4/5 · AI writer** — new `campaigns/ai-writer-panel.tsx` (indigo AI
+  accent) plugged into the **template composer** beside the body field via a
+  "✨ Write with AI" toggle. Inputs + **en/hi/hinglish** toggle; **Write with
+  AI** / **Improve draft**; result preview (message · short version · CTA ·
+  variables · approval notes) with **Use this** / **Use short** filling the
+  body. Full loading / 402-upgrade / not-configured / generic-retry states.
+  Never auto-sends. See [../campaigns/AI_WRITER_UI.md](../campaigns/AI_WRITER_UI.md).
 
 ## Guardrails (whole milestone)
 
