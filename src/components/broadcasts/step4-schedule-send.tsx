@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { ArrowLeft, Send, Loader2, Users, Save } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { CampaignInsights } from './campaign-insights';
 
 interface AudienceConfig {
   type: string;
@@ -143,6 +144,11 @@ export function Step4ScheduleSend({
           </div>
         </div>
       </div>
+
+      {/* Cost + quality insights (M04) — read-only, best-effort. */}
+      {!loadingReach && (
+        <CampaignInsights template={template} recipientCount={estimatedReach} />
+      )}
 
       {/* Processing overlay */}
       {isProcessing && (

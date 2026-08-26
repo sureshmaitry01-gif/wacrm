@@ -45,10 +45,12 @@ Per-milestone scope, deliverables, and exit criteria. Status is tracked in
 - **Exit:** ✅ All checks green (typecheck, lint, test 897/88, build). Committed `feat(m03): deepseek platform ai and metering`.
 - **Deferred:** per-account mode toggle + platform auto-reply settings (UX + schema), token-based metering, playground on platform, richer `ai_usage_log` status columns. **DeepSeek model id/API unverified against live docs — see `docs/ai/DEEPSEEK.md` §7.**
 
-## M04 — Campaign economics ⏳
-- **Scope:** The differentiated features.
-- **Planned work:** AI campaign writer (new surface on the AI abstraction, Hindi/Hinglish support); campaign cost calculator (Meta pricing config, India rates, INR); campaign quality score.
-- **Exit:** Features usable end-to-end; all checks green.
+## M04 — Campaign economics ✅ Complete
+- **Scope:** First customer-visible differentiation. Additive libs + APIs + minimal read-only UI; no migration, no send/webhook changes.
+- **Delivered:** pure cost calculator (`cost.ts`) over an editable/versioned `meta-rate-card.ts` (India defaults, unverified, no-markup default) + `/api/campaigns/estimate`; deterministic quality scorer (`quality.ts`) + `/api/campaigns/quality`; AI campaign writer (`ai/campaign.ts`) on the M03 runtime, quota-metered, with Hindi/Hinglish as a `language` mode + `/api/ai/campaign`; read-only `CampaignInsights` card on the broadcast review step; `docs/campaigns/ECONOMICS.md`.
+- **Design notes:** Meta rates are config, not hardcoded truth — every estimate carries a verification warning and tests validate math, not the rate values. Quality is deterministic-first (AI augmentation deferred). AI-writer UI deferred to M05 (endpoint ready).
+- **Exit:** ✅ All checks green (typecheck, lint, test 936/92, build). Committed `feat(m04): campaign economics writer quality and cost`.
+- **Deferred:** Meta rate verification (pre-production), AI-augmented quality, AI-writer composer UI (M05), service-window pricing, token-based AI metering.
 
 ## M05 — Premium CRM UI redesign ⏳
 - **Scope:** Design-system pass over the working screens (logic untouched).

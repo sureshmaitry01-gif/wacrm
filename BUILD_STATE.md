@@ -30,7 +30,7 @@ of every milestone.
 | **M01** | Vercel/serverless hardening, rate limiting, monitoring foundation | ✅ **Complete** |
 | **M02** | Dodo Payments + plan entitlements | ✅ **Complete** |
 | **M03** | DeepSeek platform AI + metering | ✅ **Complete** |
-| M04 | Campaign economics: cost calculator, quality score, AI campaign writer | ⏳ Not started |
+| **M04** | Campaign economics: cost calculator, quality score, AI campaign writer | ✅ **Complete** |
 | M05 | Premium CRM UI redesign | ⏳ Not started |
 | M06 | India-first onboarding | ⏳ Not started |
 | M07 | Beta readiness | ⏳ Not started |
@@ -210,6 +210,43 @@ unchanged. Campaign writer / quality score / cost calculator are **M04**.
 API contract unverified against live docs — see `docs/ai/DEEPSEEK.md` §7.
 
 Committed as `feat(m03): deepseek platform ai and metering`.
+
+## M04 — Campaign economics: writer, quality, cost ✅
+
+First customer-visible differentiation. Additive libraries + APIs +
+minimal read-only UI. **No database migration.** No send/webhook changes.
+
+**Delivered:**
+
+- **Cost calculator** — pure `src/lib/campaigns/cost.ts` over an
+  editable/versioned `meta-rate-card.ts` (India defaults, `verified:false`,
+  no-markup default). `POST /api/campaigns/estimate` (auth; never sends /
+  calls Meta).
+- **Quality score** — deterministic `src/lib/campaigns/quality.ts`
+  (0–100 + grade + risk + issues/improvements). `POST /api/campaigns/quality`
+  (no AI, no spend).
+- **AI campaign writer** — `src/lib/ai/campaign.ts` (prompt builder +
+  defensive parser) on the M03 runtime. `POST /api/ai/campaign` (agent+),
+  platform calls metered via `consumeQuota` → 402 on exceed. Hindi/Hinglish
+  is a `language` mode (en | hi | hinglish).
+- **Minimal UI** — read-only `CampaignInsights` cost+quality card on the
+  broadcast review step (step 4); AI-writer UI deferred to M05.
+- **Docs** — `docs/campaigns/ECONOMICS.md` (incl. Meta-pricing verification
+  warning + no-markup positioning).
+
+**Verification (this milestone, captured 2026-08-26):**
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✅ pass (exit 0) — clean |
+| `npm run lint` | ✅ pass (exit 0) — 0 errors, 37 warnings (pre-existing, unchanged) |
+| `npm run test` | ✅ pass (exit 0) — **936 passed / 92 files** (+39) |
+| `npm run build` | ✅ pass (exit 0) — campaign routes registered (`/api/ai/campaign`, `/api/campaigns/estimate`, `/api/campaigns/quality`) |
+
+⚠️ Meta India rates are UNVERIFIED (`verified:false`) — confirm against
+Meta's live rate card before production. See `docs/campaigns/ECONOMICS.md`.
+
+Committed as `feat(m04): campaign economics writer quality and cost`.
 
 ---
 
