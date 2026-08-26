@@ -48,6 +48,16 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-soft: var(--primary-soft);
   --color-primary-soft-2: var(--primary-soft-2);
+  /* AI accent (the reserved ~5% soft indigo). Distinct from the emerald
+   * brand so AI surfaces — campaign writer, AI insights — never compete
+   * with the primary. Exposes bg-ai, text-ai, bg-ai-soft, border-ai. */
+  --color-ai: var(--ai);
+  --color-ai-foreground: var(--ai-foreground);
+  --color-ai-soft: var(--ai-soft);
+  /* Calm elevation tokens ("premium card" shadows, not glassmorphism).
+   * Exposes shadow-card / shadow-card-hover. */
+  --shadow-card: 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 1px 3px 0 oklch(0 0 0 / 0.03);
+  --shadow-card-hover: 0 6px 16px -4px oklch(0 0 0 / 0.1), 0 2px 6px -2px oklch(0 0 0 / 0.06);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -114,10 +124,16 @@ html[data-mode="dark"] {
   --sidebar-accent: oklch(0.22 0.01 260);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.28 0.01 260);
+  /* AI accent — soft indigo, mode-tuned for legible on-dark text. */
+  --ai: oklch(0.72 0.13 268);
+  --ai-foreground: oklch(0.16 0.02 268);
+  --ai-soft: oklch(0.72 0.13 268 / 0.16);
 }
 
 html[data-mode="light"] {
-  --background: oklch(0.99 0.002 260);
+  /* Soft-gray page canvas so white cards read as elevated panels
+   * (premium-CRM direction, M05). */
+  --background: oklch(0.975 0.003 260);
   --foreground: oklch(0.21 0.01 260);
   --card: oklch(1 0 0);
   --card-2: oklch(0.985 0.002 260);
@@ -138,11 +154,16 @@ html[data-mode="light"] {
   --chart-4: oklch(0.8 0.04 260);
   --chart-5: oklch(0.87 0.03 260);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0.002 260);
+  /* Sidebar sits as a clean white rail against the soft-gray canvas. */
+  --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.21 0.01 260);
   --sidebar-accent: oklch(0.96 0.004 260);
   --sidebar-accent-foreground: oklch(0.25 0.01 260);
   --sidebar-border: oklch(0.922 0.004 260);
+  /* AI accent — soft indigo, mode-tuned for legible on-light text. */
+  --ai: oklch(0.52 0.19 268);
+  --ai-foreground: oklch(0.985 0 0);
+  --ai-soft: oklch(0.52 0.19 268 / 0.1);
 }
 
 /* ---- ACCENT: primary color ---- */

@@ -23,7 +23,10 @@ export const THEME_IDS = [
 
 export type ThemeId = (typeof THEME_IDS)[number];
 
-export const DEFAULT_THEME: ThemeId = "violet";
+// Emerald is the default accent for the hosted SaaS — WhatsApp-adjacent
+// green without copying the exact brand colour (see M05 UI direction).
+// Other accents (violet/cobalt/amber/rose) remain selectable.
+export const DEFAULT_THEME: ThemeId = "emerald";
 
 export const STORAGE_KEY = "wacrm.theme";
 
@@ -37,13 +40,16 @@ export const STORAGE_KEY = "wacrm.theme";
  * opt-in eye-strain-friendly alternative.
  *
  * Persisted under its own localStorage key so it composes freely
- * with the accent choice (you can run Violet-light or Violet-dark).
+ * with the accent choice (you can run Emerald-light or Emerald-dark).
+ *
+ * Light is the default for the hosted SaaS (the premium-CRM direction in
+ * M05); dark remains fully supported and selectable.
  */
 export const MODES = ["light", "dark"] as const;
 
 export type Mode = (typeof MODES)[number];
 
-export const DEFAULT_MODE: Mode = "dark";
+export const DEFAULT_MODE: Mode = "light";
 
 export const MODE_STORAGE_KEY = "wacrm.mode";
 

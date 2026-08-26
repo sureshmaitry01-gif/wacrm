@@ -41,8 +41,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#020617",
-  colorScheme: "dark light",
+  // Light-first: the soft-gray page canvas (matches globals.css light
+  // --background). Dark remains selectable.
+  themeColor: "#f6f7f8",
+  colorScheme: "light dark",
 };
 
 // Inline boot script — runs before React hydrates so the user's
