@@ -42,6 +42,16 @@ BEGIN
     RAISE EXCEPTION 'public.accounts is missing — migration 017 did not apply';
   END IF;
 
+  -- Billing foundation (040). subscriptions is the load-bearing table:
+  -- the accounts seed trigger writes it and every entitlement read
+  -- resolves through it.
+  IF to_regclass('public.subscriptions') IS NULL THEN
+    RAISE EXCEPTION 'public.subscriptions is missing — migration 040 did not apply';
+  END IF;
+  IF to_regclass('public.usage_counters') IS NULL THEN
+    RAISE EXCEPTION 'public.usage_counters is missing — migration 040 did not apply';
+  END IF;
+
   RAISE NOTICE 'schema verification passed';
 END
 $$;

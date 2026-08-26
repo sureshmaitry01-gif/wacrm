@@ -52,8 +52,8 @@ own AI budget at scale:
 | M00A | Fork audit & conversion plan | Decide | ✅ Complete |
 | M00B | Fork hygiene + SaaS conversion foundation | Document & guardrail | ✅ Complete |
 | M01 | Vercel/serverless hardening + monitoring | Safety | ✅ Complete |
-| M02 | Dodo Payments + plan entitlements | Money in | ⏳ Next |
-| M03 | DeepSeek platform AI + metering | Metered AI | ⏳ |
+| M02 | Dodo Payments + plan entitlements | Money in | ✅ Complete |
+| M03 | DeepSeek platform AI + metering | Metered AI | ⏳ Next |
 | M04 | Campaign economics (calculator, score, writer) | Differentiation | ⏳ |
 | M05 | Premium CRM UI redesign | Experience | ⏳ |
 | M06 | India-first onboarding | Activation | ⏳ |

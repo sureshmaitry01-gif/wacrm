@@ -15,6 +15,10 @@ import {
   rateLimitResponse,
   RATE_LIMITS,
 } from '@/lib/rate-limit'
+import {
+  consumeQuota,
+  upgradeRequiredResponse,
+} from '@/lib/billing/entitlements'
 
 interface BroadcastResult {
   phone: string
@@ -118,6 +122,27 @@ export async function POST(request: Request) {
         { error: 'template_name is required' },
         { status: 400 }
       )
+    }
+
+    // ---- Plan entitlement gate (M02 proof-of-gating surface) ----
+    // Metered on MESSAGES, not broadcasts: the campaign wizard fans one
+    // campaign out over this endpoint in batches of ~10 recipients, so a
+    // per-call "broadcast" counter would count batches rather than
+    // campaigns. `recipients.length` is exactly how many messages this
+    // call will attempt, which makes the meter honest either way it's
+    // called (wizard batches or a single direct API call).
+    //
+    // Consumed BEFORE the Meta fan-out so we never send past the plan.
+    // `consumeQuota` fails open on any DB/RPC error — billing must not
+    // take down sending.
+    const quota = await consumeQuota(
+      supabase,
+      accountId,
+      'monthly_messages_limit',
+      recipients.length,
+    )
+    if (!quota.allowed) {
+      return upgradeRequiredResponse(quota)
     }
 
     const { data: config, error: configError } = await supabase

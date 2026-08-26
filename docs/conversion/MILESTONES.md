@@ -31,10 +31,12 @@ Per-milestone scope, deliverables, and exit criteria. Status is tracked in
 - **Exit:** ✅ All checks green (typecheck, lint, test 842/81, build). Committed `feat(m01): vercel serverless hardening and monitoring foundation`.
 - **Deferred to production cutover / later:** actual SDK installs, custom domain + Meta webhook repoint, load testing.
 
-## M02 — Dodo Payments + plan entitlements ⏳
-- **Scope:** Billing + entitlement enforcement (net-new, reusing existing RLS + signature-verified-webhook patterns).
-- **Planned work:** plan catalog; `subscriptions` / entitlements / usage-counter migrations (versioned, account-scoped RLS); `billing/provider` abstraction + Dodo adapter; signature-verified Dodo webhook; signup seeds a free plan; quota-gating helper (SECURITY DEFINER); billing/upgrade UI.
-- **Exit:** Users can subscribe; entitlements enforced; INR verified; all checks green.
+## M02 — Dodo Payments + plan entitlements ✅ Complete
+- **Scope:** Billing + entitlement foundation, reusing the existing RLS + signature-verified-webhook patterns.
+- **Delivered:** migration `040_billing_dodo.sql` (5 account-scoped tables, `consume_quota` RPC, `seed_account_billing` trigger + backfill); INR-first plan catalog in code; entitlement resolver + atomic quota gate (both fail-open); dependency-free Dodo adapter behind a `BillingProvider` abstraction; idempotent, fail-closed webhook; `/api/billing/{webhook,status,checkout}`; one proof-of-gating surface (broadcast, metered on messages); minimal `Settings → Plan & billing` panel; `docs/billing/DODO.md`.
+- **Design notes:** free-plan seeding is a **separate** `accounts` trigger, not an edit to `handle_new_user`. Lapsed subscriptions degrade to Free limits rather than locking the account. Plan limits live in code so pricing changes need no migration.
+- **Exit:** ✅ All checks green (typecheck, lint, test 878/84, build). Committed `feat(m02): dodo payments and plan entitlements`.
+- **Deferred:** dunning/grace (M07), proration, gating beyond the one surface, billing UI polish (M05), customer portal. **Migration not yet applied to a live DB; Dodo assumptions unverified — see `docs/billing/DODO.md` §6.**
 
 ## M03 — DeepSeek platform AI + metering ⏳
 - **Scope:** Platform-provided AI, metered to plan quotas from M02.

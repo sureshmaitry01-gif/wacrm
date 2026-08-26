@@ -28,7 +28,7 @@ of every milestone.
 | **M00A** | WACRM fork audit & conversion plan | ✅ **Complete** |
 | **M00B** | Fork hygiene + SaaS conversion foundation | ✅ **Complete** |
 | **M01** | Vercel/serverless hardening, rate limiting, monitoring foundation | ✅ **Complete** |
-| M02 | Dodo Payments + plan entitlements | ⏳ Not started |
+| **M02** | Dodo Payments + plan entitlements | ✅ **Complete** |
 | M03 | DeepSeek platform AI + metering | ⏳ Not started |
 | M04 | Campaign economics: cost calculator, quality score, AI campaign writer | ⏳ Not started |
 | M05 | Premium CRM UI redesign | ⏳ Not started |
@@ -120,6 +120,54 @@ new keys.
 | `npm run build` | ✅ pass (exit 0) — Next 16, all routes compiled |
 
 Committed as `feat(m01): vercel serverless hardening and monitoring foundation`.
+
+## M02 — Dodo Payments + plan entitlements ✅
+
+First milestone with **schema changes**. Adds the billing + entitlement
+foundation. No AI, campaign-economics, UI-redesign, or WhatsApp behavior
+changes. All Dodo env vars are optional — unset means "not configured", and
+local dev/tests run normally.
+
+**Delivered:**
+
+- **Migration `040_billing_dodo.sql`** — `billing_customers`,
+  `subscriptions`, `entitlements`, `dodo_webhook_events`, `usage_counters`;
+  `consume_quota()` RPC; `seed_account_billing` trigger + backfill. All
+  account-scoped with `is_account_member` RLS, matching migration 029's
+  idiom. CI schema assertions extended.
+- **Plan catalog** (`src/lib/billing/plans.ts`) — INR-first Free / Starter /
+  Growth / Agency / Enterprise with all eight limit keys; numbers are
+  plain code, easy to edit.
+- **Entitlements + quota** (`entitlements.ts`) — override-then-plan
+  resolution, lapsed plans degrade to Free limits (not lockout), atomic
+  `consumeQuota`, 402 `upgradeRequiredResponse`. **Both fail open.**
+- **Provider abstraction** (`types.ts`, `provider.ts`) + **Dodo adapter**
+  (`providers/dodo.ts`) — **dependency-free** (fetch + node:crypto),
+  Standard-Webhooks HMAC that **fails closed**, defensive event mapping.
+- **Routes** — `POST /api/billing/webhook` (verify → store idempotently →
+  apply; PII-scrubbed payloads), `GET /api/billing/status`,
+  `POST /api/billing/checkout` (admin+).
+- **Proof-of-gating** — `POST /api/whatsapp/broadcast` meters
+  `monthly_messages_limit` by recipient count (not per-call broadcasts —
+  the wizard batches), consumed before the Meta fan-out.
+- **UI** — minimal `Settings → Plan & billing` panel (plan, status, usage,
+  upgrade CTAs). Visual polish deferred to M05.
+- **Docs** — `docs/billing/DODO.md`, incl. the unverified-external-
+  assumptions list.
+
+**Verification (this milestone, captured 2026-08-26):**
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✅ pass (exit 0) — clean |
+| `npm run lint` | ✅ pass (exit 0) — 0 errors, 37 warnings (pre-existing, unchanged) |
+| `npm run test` | ✅ pass (exit 0) — **878 passed / 84 files** (+36) |
+| `npm run build` | ✅ pass (exit 0) — billing routes registered |
+
+⚠️ **Migration 040 has NOT been applied to any live database**, and no live
+Dodo account is connected. See `docs/billing/DODO.md` §6 before go-live.
+
+Committed as `feat(m02): dodo payments and plan entitlements`.
 
 ---
 
