@@ -32,7 +32,7 @@ of every milestone.
 | **M03** | DeepSeek platform AI + metering | ✅ **Complete** |
 | **M04** | Campaign economics: cost calculator, quality score, AI campaign writer | ✅ **Complete** |
 | **M05** | Premium CRM UI redesign | ✅ **Complete** |
-| M06 | India-first onboarding | ⏳ Not started |
+| **M06** | India-first onboarding | ✅ **Complete** |
 | M07 | Beta readiness | ⏳ Not started |
 
 Full detail: [docs/conversion/MILESTONES.md](docs/conversion/MILESTONES.md).
@@ -302,7 +302,29 @@ route-contract changes. See [docs/ui/M05_UI_DIRECTION.md](docs/ui/M05_UI_DIRECTI
 
 **M05 done** — the full premium light+emerald redesign shipped across the
 app shell, inbox, campaign wizard + AI writer, dashboard, billing/settings,
-and contacts/templates. Next: M06 (India-first onboarding).
+and contacts/templates.
+
+## M06 — India-first onboarding ✅
+
+A dashboard first-run **onboarding checklist** guiding a new Indian SMB from
+signup to first campaign: Connect WhatsApp → Add contacts → Create a
+template (AI + Hinglish) → Send a campaign. Progress bar, next-step
+highlight, and plain-English INR / no-markup / approval copy.
+
+- **No migration** — every step's completion is derived from existing
+  account-scoped rows (`whatsapp_config`, `contacts`, `message_templates`,
+  `broadcasts`) at read time; the card auto-hides when complete, and
+  early-dismissal is per-account `localStorage` (like theme prefs).
+- **Pure logic** (`src/lib/onboarding/steps.ts`) unit-tested; the component
+  (`onboarding-checklist.tsx`) only fetches + renders.
+- **English-hardcoded copy** (like the M04/M05C campaign UI) — the app has
+  no per-user language switcher and `ko.json` parity is test-enforced, so
+  no `en.json`/`ko.json` keys were added. Real Hindi *UI* localization is
+  recommended as a separate milestone (see
+  [docs/onboarding/INDIA_FIRST_ONBOARDING.md](docs/onboarding/INDIA_FIRST_ONBOARDING.md)).
+- Guardrails: no WhatsApp/Dodo/DeepSeek/quota/RLS internals, no Drizzle, no
+  new deps. Checks: typecheck ✅, lint ✅ (37 warnings), test ✅ 946/93,
+  build ✅. Commit `feat(m06): india-first onboarding`.
 
 ---
 
