@@ -274,7 +274,15 @@ route-contract changes. See [docs/ui/M05_UI_DIRECTION.md](docs/ui/M05_UI_DIRECTI
   typecheck ✅, lint ✅ (37 warnings), test ✅ 936/92, build ✅. Commit
   `feat(m05c): campaign wizard and ai writer ui`. Docs:
   `docs/campaigns/AI_WRITER_UI.md`.
-- M05D–F (dashboard, billing/settings, contacts/templates) — pending.
+- **M05D — dashboard / analytics polish ✅**: KPI cards elevated with
+  semantic green/red trend pills (decoupled from brand accent); the three
+  chart cards elevated; conversations chart recoloured to emerald +
+  muted-slate, response-time bars to emerald; activity feed + quick-action
+  badge contrast fixed for light. Restyle only — all dashboard queries /
+  calculations / chart geometry preserved. Checks: typecheck ✅, lint ✅
+  (37 warnings), test ✅ 936/92, build ✅. Commit
+  `feat(m05d): dashboard analytics polish`.
+- M05E–F (billing/settings, contacts/templates) — pending.
 
 ---
 

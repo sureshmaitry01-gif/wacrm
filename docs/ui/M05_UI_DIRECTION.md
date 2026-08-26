@@ -44,8 +44,8 @@ are copied.
 |---|---|---|
 | **M05A** | Design tokens + app-shell/primitive foundation | ✅ done |
 | **M05B** | Shared inbox redesign (filters · list · thread · customer panel) | ✅ done |
-| **M05C** | Campaign wizard redesign + AI writer composer UI | ✅ this pass |
-| M05D | Dashboard / analytics polish (KPI cards, charts) | ⏳ |
+| **M05C** | Campaign wizard redesign + AI writer composer UI | ✅ done |
+| **M05D** | Dashboard / analytics polish (KPI cards, charts) | ✅ this pass |
 | M05E | Billing / settings polish | ⏳ |
 | M05F | Contacts / templates light polish | ⏳ |
 
@@ -118,6 +118,28 @@ Restyle + one net-new UI (the AI writer), consuming only existing M04 APIs
   variables · approval notes) with **Use this** / **Use short** filling the
   body. Full loading / 402-upgrade / not-configured / generic-retry states.
   Never auto-sends. See [../campaigns/AI_WRITER_UI.md](../campaigns/AI_WRITER_UI.md).
+
+## M05D — what changed (dashboard / analytics)
+
+Restyle only — all data queries, calculations, chart geometry, and route
+behavior preserved. Every widget already shared the
+`rounded-xl border border-border bg-card` language; the pass adds the M05A
+**calm elevation** and tightens colour semantics.
+
+- **M05D-2 · KPI cards** — `MetricCard` gains `shadow-card`; the delta is
+  now a **rounded trend pill** (semantic **green up / red down**,
+  deliberately decoupled from the brand accent, `-600/-400` for light+dark).
+  `SkeletonCard` matches so there's no load-in elevation shift. Quick-action
+  tiles get `shadow-card` + a subtle hover lift.
+- **M05D-3 · charts** — the three chart cards get `shadow-card`. The
+  conversations line chart is recoloured to **emerald (incoming, primary) +
+  muted slate (outgoing, secondary)** — was blue/violet — across lines,
+  legend, hover dots, and tooltip. Response-time bars → **emerald** (was
+  violet). Pipeline donut keeps user-defined stage colours. Gridlines stay
+  soft (`var(--border)`).
+- **M05D-4 · activity + states** — activity feed gets `shadow-card`; its
+  kind badges and the quick-action tints fixed to `-600 dark:-400` so
+  amber/blue/rose read on the light canvas.
 
 ## Guardrails (whole milestone)
 

@@ -49,7 +49,7 @@ export function ConversationsChart({ series, loading, range, onRangeChange }: Co
   }, [data])
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border bg-card">
+    <section className="flex h-full flex-col rounded-xl border border-border bg-card shadow-card">
       <header className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
           <h2 className="text-sm font-semibold text-foreground">{t('title')}</h2>
@@ -89,8 +89,8 @@ export function ConversationsChart({ series, loading, range, onRangeChange }: Co
       </div>
 
       <footer className="flex items-center gap-4 border-t border-border px-5 py-3 text-xs text-muted-foreground">
-        <LegendDot color="#3b82f6" label={t('incoming')} />
-        <LegendDot color="#7c3aed" label={t('outgoing')} />
+        <LegendDot color="#10b981" label={t('incoming')} />
+        <LegendDot color="#64748b" label={t('outgoing')} />
       </footer>
     </section>
   )
@@ -243,20 +243,20 @@ function LineSvg({
           ) : null,
         )}
 
-        {/* Outgoing polyline (violet) */}
+        {/* Outgoing polyline (muted slate — secondary series) */}
         <path
           d={outgoingPath}
           fill="none"
-          stroke="#7c3aed"
+          stroke="#64748b"
           strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        {/* Incoming polyline (blue) */}
+        {/* Incoming polyline (emerald — primary series) */}
         <path
           d={incomingPath}
           fill="none"
-          stroke="#3b82f6"
+          stroke="#10b981"
           strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -273,8 +273,8 @@ function LineSvg({
               stroke="var(--muted-foreground)"
               strokeDasharray="3 3"
             />
-            <circle cx={hoverX} cy={yFor(data[hover.idx].incoming)} r={3.5} fill="#3b82f6" />
-            <circle cx={hoverX} cy={yFor(data[hover.idx].outgoing)} r={3.5} fill="#7c3aed" />
+            <circle cx={hoverX} cy={yFor(data[hover.idx].incoming)} r={3.5} fill="#10b981" />
+            <circle cx={hoverX} cy={yFor(data[hover.idx].outgoing)} r={3.5} fill="#64748b" />
           </g>
         )}
       </svg>
@@ -290,12 +290,12 @@ function LineSvg({
         >
           <div className="font-medium text-popover-foreground">{longDayLabel(hovered.day)}</div>
           <div className="mt-1 flex flex-col gap-0.5">
-            <span className="flex items-center gap-1.5 text-blue-300">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
+            <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
               {t('tooltipIncoming', { count: hovered.incoming })}
             </span>
-            <span className="flex items-center gap-1.5 text-primary">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
+            <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-500" />
               {t('tooltipOutgoing', { count: hovered.outgoing })}
             </span>
           </div>

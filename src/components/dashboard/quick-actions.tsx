@@ -19,8 +19,8 @@ interface Action {
 
 const ACTIONS: Action[] = [
   { labelKey: 'newContact', href: '/contacts', icon: UserPlus, tint: 'text-primary' },
-  { labelKey: 'newDeal', href: '/pipelines', icon: Briefcase, tint: 'text-blue-400' },
-  { labelKey: 'newBroadcast', href: '/broadcasts/new', icon: Radio, tint: 'text-amber-400' },
+  { labelKey: 'newDeal', href: '/pipelines', icon: Briefcase, tint: 'text-blue-600 dark:text-blue-400' },
+  { labelKey: 'newBroadcast', href: '/broadcasts/new', icon: Radio, tint: 'text-amber-600 dark:text-amber-400' },
   { labelKey: 'newAutomation', href: '/automations/new', icon: Zap, tint: 'text-primary' },
 ]
 
@@ -35,7 +35,7 @@ export function QuickActions() {
           <Link
             key={a.href}
             href={a.href}
-            className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:border-border hover:bg-muted/60"
+            className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover"
           >
             <div className={`flex h-9 w-9 items-center justify-center rounded-lg bg-muted ${a.tint}`}>
               <Icon className="h-4 w-4" />
