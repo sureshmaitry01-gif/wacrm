@@ -1,23 +1,30 @@
 /**
- * In-memory per-key rate limiter.
+ * Per-key rate limiter with two backends.
  *
- * Fixed-window counter (not token bucket): every identifier gets a
- * fresh N-request budget each window. Simple, allocation-light, and
- * fine for a single-instance VPS — which is how forkers of this
- * template will usually deploy.
+ * Backend selection is automatic, per call:
  *
- * Trade-off: a single Node process holds the Map, so horizontal scale
- * (multiple regions, multiple Hostinger nodes, Vercel serverless fan-
- * out) silently defeats the limit. If you scale beyond one instance,
- * swap the `check` implementation for Redis / Upstash / Cloudflare
- * Durable Objects keeping the same return shape. The call sites won't
- * change.
+ *   • Upstash Redis (production / Vercel) — used when BOTH
+ *     `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set.
+ *     A fixed-window counter kept in Redis, so the limit holds across
+ *     every serverless invocation / region — the in-memory Map below is
+ *     defeated by Vercel's serverless fan-out (each invocation may be a
+ *     fresh process), which is exactly why this backend exists.
  *
- * Memory: entries are ~50 bytes each. With LIGHT_SWEEP below, expired
- * keys get cleared opportunistically on every ~1 000th call, so a
- * healthy instance stays in the low-MB range even with thousands of
- * distinct users. No background timer — works in serverless edge
- * runtimes that don't keep timers alive across requests.
+ *   • In-memory Map (local dev / self-host / fallback) — used when the
+ *     Upstash env vars are absent, OR when an Upstash call fails. This is
+ *     the original single-process fixed-window limiter; it is correct for
+ *     a single instance and keeps local development working with zero
+ *     external services.
+ *
+ * Fail-open: if Upstash is configured but the request errors or times out,
+ * we fall back to the in-memory limiter rather than blocking the user. A
+ * limiter outage should degrade protection, not take down the app.
+ *
+ * Public API: `checkRateLimit` is async (a network backend is inherently
+ * async). The return shape (`RateLimitResult`) is unchanged, so call sites
+ * only add `await`. The in-memory path is exposed as
+ * `checkRateLimitInMemory` for deterministic unit tests and as the shared
+ * fallback.
  */
 
 import { NextResponse } from 'next/server';
@@ -38,6 +45,10 @@ export interface RateLimitResult {
   limit: number;
 }
 
+// ============================================================
+// In-memory backend (local dev / self-host / fallback)
+// ============================================================
+
 interface Entry {
   count: number;
   resetAt: number;
@@ -57,7 +68,13 @@ function sweepExpired(now: number) {
   }
 }
 
-export function checkRateLimit(
+/**
+ * Single-process fixed-window counter. Synchronous and dependency-free.
+ * Used directly in local dev / self-host and as the fallback when an
+ * Upstash call can't be made. Its behaviour is identical to the limiter
+ * this module shipped with before the Upstash backend was added.
+ */
+export function checkRateLimitInMemory(
   key: string,
   { limit, windowMs }: RateLimitOptions,
 ): RateLimitResult {
@@ -87,6 +104,105 @@ export function checkRateLimit(
     reset: entry.resetAt,
     limit,
   };
+}
+
+// ============================================================
+// Upstash Redis backend (production / Vercel)
+// ============================================================
+
+/** Keep the limiter fast: a slow Redis must never dominate request
+ *  latency. On timeout we fail open to the in-memory backend. */
+const UPSTASH_TIMEOUT_MS = 1500;
+
+/** True when both Upstash REST env vars are present. Exposed so callers /
+ *  health checks can report which backend is active. */
+export function isUpstashConfigured(): boolean {
+  return Boolean(
+    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
+  );
+}
+
+/**
+ * Fixed-window counter in Redis via the Upstash REST API — no SDK, just
+ * `fetch`, so there is no hard dependency and nothing to install for local
+ * dev.
+ *
+ * The key is stamped with the window id (`floor(now / windowMs)`) so each
+ * window is a distinct Redis key that expires on its own; no branching /
+ * Lua needed. One pipelined round trip:
+ *   INCR   rl:<key>:<windowId>        → current count in this window
+ *   PEXPIRE rl:<key>:<windowId> <ms>  → self-cleaning TTL
+ *
+ * Returns `null` (never throws) when Upstash isn't configured or the call
+ * fails, signalling the caller to fall back to the in-memory backend.
+ */
+async function checkUpstash(
+  key: string,
+  { limit, windowMs }: RateLimitOptions,
+): Promise<RateLimitResult | null> {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+
+  const now = Date.now();
+  const windowId = Math.floor(now / windowMs);
+  const redisKey = `rl:${key}:${windowId}`;
+  const reset = (windowId + 1) * windowMs;
+
+  try {
+    const res = await fetch(`${url.replace(/\/$/, '')}/pipeline`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([
+        ['INCR', redisKey],
+        ['PEXPIRE', redisKey, String(windowMs)],
+      ]),
+      signal: AbortSignal.timeout(UPSTASH_TIMEOUT_MS),
+      cache: 'no-store',
+    });
+
+    if (!res.ok) return null;
+
+    // Pipeline response: [{ result: <count> }, { result: 1 }].
+    const data = (await res.json().catch(() => null)) as
+      | { result?: unknown; error?: unknown }[]
+      | null;
+    const count = Number(data?.[0]?.result);
+    if (!Number.isFinite(count)) return null;
+
+    return {
+      success: count <= limit,
+      remaining: Math.max(0, limit - count),
+      reset,
+      limit,
+    };
+  } catch {
+    // Network error / timeout / abort — fail open to in-memory.
+    return null;
+  }
+}
+
+// ============================================================
+// Public entry point
+// ============================================================
+
+/**
+ * Check (and consume) one unit of the budget for `key`.
+ *
+ * Uses the Upstash backend when configured; otherwise, or on any Upstash
+ * failure, uses the in-memory backend. Always resolves to a
+ * `RateLimitResult` — never rejects.
+ */
+export async function checkRateLimit(
+  key: string,
+  opts: RateLimitOptions,
+): Promise<RateLimitResult> {
+  const viaUpstash = await checkUpstash(key, opts);
+  if (viaUpstash) return viaUpstash;
+  return checkRateLimitInMemory(key, opts);
 }
 
 /**
@@ -150,9 +266,8 @@ export const RATE_LIMITS = {
   /** Public REST API (`/api/v1/*`), keyed per API key. 120/min ≈ 2
    *  req/s sustained — comfortable for a polling integration or an
    *  automation firing on inbound events, while bounding a runaway
-   *  script. Like every bucket here it's per-process; a multi-
-   *  instance deploy needs the Redis swap described at the top of
-   *  this file (the per-key call sites don't change). */
+   *  script. With the Upstash backend this now holds across a
+   *  multi-instance / serverless deploy, not just per process. */
   publicApi: { limit: 120, windowMs: 60_000 },
   /** AI draft-reply generation, per user. 20/min is generous for an
    *  agent clicking "Draft with AI" while working a thread, and bounds

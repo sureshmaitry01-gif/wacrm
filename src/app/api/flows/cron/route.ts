@@ -1,7 +1,7 @@
-import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { resolveFallbackPolicy } from '@/lib/flows/fallback'
+import { authorizeCronRequest } from '@/lib/cron/auth'
 
 /**
  * Sweep abandoned active flow runs.
@@ -16,10 +16,12 @@ import { resolveFallbackPolicy } from '@/lib/flows/fallback'
  * index on `flow_runs WHERE status='active'`) forever — blocking any
  * new triggers for them. The cron is therefore not optional.
  *
- * Auth: re-uses `AUTOMATION_CRON_SECRET` so operators only have one
- * secret to provision. The two endpoints (`/api/automations/cron`
- * and this one) are independent operations; we keep them on separate
- * URLs so one failing doesn't block the other.
+ * Auth: shared cron secret via `@/lib/cron/auth` — accepts either the
+ * `x-cron-secret` header (`AUTOMATION_CRON_SECRET`) or Vercel Cron's
+ * `Authorization: Bearer` (`CRON_SECRET`). Re-uses the same secret as
+ * `/api/automations/cron` so operators provision one value; the two
+ * endpoints are independent operations kept on separate URLs so one
+ * failing doesn't block the other.
  *
  * Hosting: hit on a schedule (Vercel Cron / GitHub Actions / external
  * pinger). A 5-minute interval is more than enough for a 24h timeout
@@ -27,22 +29,9 @@ import { resolveFallbackPolicy } from '@/lib/flows/fallback'
  * tenants.
  */
 export async function GET(request: Request) {
-  const expected = process.env.AUTOMATION_CRON_SECRET
-  if (!expected) {
-    return NextResponse.json({ error: 'cron not configured' }, { status: 503 })
-  }
-  // Constant-time compare so an attacker who can hit the endpoint
-  // can't recover the secret byte-by-byte from response-time deltas.
-  // Length pre-check is required by timingSafeEqual (throws otherwise)
-  // and leaks only the length itself, which isn't sensitive.
-  const supplied = request.headers.get('x-cron-secret') ?? ''
-  const suppliedBuf = Buffer.from(supplied)
-  const expectedBuf = Buffer.from(expected)
-  if (
-    suppliedBuf.length !== expectedBuf.length ||
-    !timingSafeEqual(suppliedBuf, expectedBuf)
-  ) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = authorizeCronRequest(request)
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
   const admin = supabaseAdmin()

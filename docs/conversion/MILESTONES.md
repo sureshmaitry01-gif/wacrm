@@ -20,15 +20,16 @@ Per-milestone scope, deliverables, and exit criteria. Status is tracked in
 - **Deliverables:** `BUILD_STATE.md`, `docs/decisions/README.md`, `ROADMAP.md`, this file, `SAAS_POSITIONING.md`; `AGENTS.md` guardrails; commented future env placeholders; README conversion banner.
 - **Exit:** All four checks green; committed as `chore(m00b): establish SaaS fork conversion foundation`.
 
-## M01 — Vercel/serverless hardening + monitoring foundation ⏳ Next
-- **Scope:** Make the app production-safe on Vercel.
-- **Planned work:**
-  - Replace the in-memory rate limiter (`src/lib/rate-limit.ts`) with a distributed store (Upstash Redis) — same return shape, call sites unchanged.
-  - Move automation/flow crons to Vercel Cron (wire to existing secret-protected endpoints).
-  - Re-validate `next.config.ts` cache headers for Vercel edge; review broadcast fan-out (`after()`) against serverless duration limits (introduce a cron-drained queue if needed).
-  - Wire Sentry (errors) + PostHog (product analytics), env-flagged.
-  - Vercel project config + env separation (preview/prod).
-- **Exit:** Deploys clean on Vercel, monitored, rate limiting effective across instances; all checks green.
+## M01 — Vercel/serverless hardening + monitoring foundation ✅ Complete
+- **Scope:** Make the app production-safe on Vercel. Documentation + hardening; no product behavior or schema change.
+- **Delivered:**
+  - Rate limiter (`src/lib/rate-limit.ts`) now has an **Upstash Redis backend** (fixed-window via REST `fetch`, no SDK dependency) selected when the Upstash env vars are set, with **in-memory fallback** (local dev + fail-open). `checkRateLimit` is now `async`; 23 call sites await it; same `RateLimitResult` shape.
+  - **Vercel Cron** wired via `vercel.json`; new tested `src/lib/cron/auth.ts` accepts both the existing `x-cron-secret` and Vercel's `Authorization: Bearer <CRON_SECRET>` (backward-compatible). Both cron routes refactored onto it.
+  - **Monitoring foundations** (`src/lib/observability/`): env-flagged, no-op-when-unset Sentry + PostHog seams with a PII denylist. Dependency-free; not yet wired into product code.
+  - **Docs:** `docs/deployment/VERCEL.md`, `docs/observability/README.md`; `.env.local.example` gains `CRON_SECRET`.
+- **Findings (documented, no code change):** broadcast fan-out already uses `after()` + `maxDuration` + a resume path (migration 038). **Durable queue postponed to M07.** `next.config.ts` cache headers reviewed — left as-is (defensive; revisit at production cutover). Sentry/PostHog **SDKs deferred** (Next 16 compat) — seams are the wiring point.
+- **Exit:** ✅ All checks green (typecheck, lint, test 842/81, build). Committed `feat(m01): vercel serverless hardening and monitoring foundation`.
+- **Deferred to production cutover / later:** actual SDK installs, custom domain + Meta webhook repoint, load testing.
 
 ## M02 — Dodo Payments + plan entitlements ⏳
 - **Scope:** Billing + entitlement enforcement (net-new, reusing existing RLS + signature-verified-webhook patterns).

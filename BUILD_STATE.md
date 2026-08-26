@@ -27,7 +27,7 @@ of every milestone.
 |---|---|---|
 | **M00A** | WACRM fork audit & conversion plan | ✅ **Complete** |
 | **M00B** | Fork hygiene + SaaS conversion foundation | ✅ **Complete** |
-| M01 | Vercel/serverless hardening, rate limiting, monitoring foundation | ⏳ Not started |
+| **M01** | Vercel/serverless hardening, rate limiting, monitoring foundation | ✅ **Complete** |
 | M02 | Dodo Payments + plan entitlements | ⏳ Not started |
 | M03 | DeepSeek platform AI + metering | ⏳ Not started |
 | M04 | Campaign economics: cost calculator, quality score, AI campaign writer | ⏳ Not started |
@@ -75,6 +75,51 @@ schema migrations added. No services wired.**
 | `npm run build` | ✅ pass (exit 0) — Next 16, all routes compiled |
 
 Committed as `chore(m00b): establish SaaS fork conversion foundation`.
+
+## M01 — Vercel/serverless hardening + monitoring foundation ✅
+
+First milestone with runtime code changes. **No product behavior changed**
+(no WhatsApp send/webhook logic, no DB/RLS, no schema migrations). New
+external services are env-flagged and no-op when unset; local dev needs no
+new keys.
+
+**Delivered:**
+
+- **Distributed rate limiting.** `src/lib/rate-limit.ts` now selects a
+  backend per call: **Upstash Redis** (fixed-window via REST `fetch`, **no
+  SDK dependency**) when `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
+  are set; **in-memory** otherwise, and as a fail-open fallback on any
+  Upstash error. `checkRateLimit` became `async` (same `RateLimitResult`
+  shape); all 23 call sites now `await`. New tests cover both backends
+  and the fail-open path.
+- **Vercel Cron.** `vercel.json` schedules `/api/automations/cron` and
+  `/api/flows/cron`. New shared, tested helper `src/lib/cron/auth.ts`
+  accepts **either** the existing `x-cron-secret` (`AUTOMATION_CRON_SECRET`)
+  **or** Vercel Cron's `Authorization: Bearer` (`CRON_SECRET`) —
+  backward-compatible; both cron routes refactored onto it.
+- **Monitoring foundations (no-op when unset).** `src/lib/observability/`
+  — Sentry seam (`captureException`/`captureMessage`, gated on `SENTRY_DSN`)
+  and PostHog seam (`captureEvent`/`sanitizeProps`, gated on
+  `NEXT_PUBLIC_POSTHOG_KEY`) with a PII denylist guard. Dependency-free;
+  not yet wired into product code (foundation only).
+- **Docs.** `docs/deployment/VERCEL.md` (env vars, cron, serverless review),
+  `docs/observability/README.md` (privacy note + how to complete SDK
+  wiring). `.env.local.example` gains `CRON_SECRET`.
+- **Serverless risk review (documented, no code change):** broadcast
+  fan-out already uses `after()` + explicit `maxDuration` and has a resume
+  path (migration 038). A cron-drained durable queue is **postponed to
+  M07**; do not rewrite the campaign system now.
+
+**Verification (this milestone, captured 2026-08-26):**
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✅ pass (exit 0) — clean |
+| `npm run lint` | ✅ pass (exit 0) — 0 errors, 37 warnings (pre-existing, unchanged) |
+| `npm run test` | ✅ pass (exit 0) — **842 passed / 81 files** (+17 new) |
+| `npm run build` | ✅ pass (exit 0) — Next 16, all routes compiled |
+
+Committed as `feat(m01): vercel serverless hardening and monitoring foundation`.
 
 ---
 
