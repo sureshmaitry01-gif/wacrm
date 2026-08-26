@@ -149,7 +149,7 @@ export function QuickRepliesManager() {
           {items.map((qr) => (
             <li
               key={qr.id}
-              className="flex items-start gap-3 rounded-lg border border-border bg-card p-3"
+              className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 shadow-card"
             >
               {qr.kind === "interactive" ? (
                 <Zap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -172,7 +172,7 @@ export function QuickRepliesManager() {
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => remove(qr.id)}
-                  className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                  className="text-red-500 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

@@ -31,7 +31,7 @@ of every milestone.
 | **M02** | Dodo Payments + plan entitlements | ✅ **Complete** |
 | **M03** | DeepSeek platform AI + metering | ✅ **Complete** |
 | **M04** | Campaign economics: cost calculator, quality score, AI campaign writer | ✅ **Complete** |
-| M05 | Premium CRM UI redesign | ⏳ Not started |
+| **M05** | Premium CRM UI redesign | ✅ **Complete** |
 | M06 | India-first onboarding | ⏳ Not started |
 | M07 | Beta readiness | ⏳ Not started |
 
@@ -248,7 +248,7 @@ Meta's live rate card before production. See `docs/campaigns/ECONOMICS.md`.
 
 Committed as `feat(m04): campaign economics writer quality and cost`.
 
-## M05 — Premium CRM UI redesign (checkpoint-based) 🔄 In progress
+## M05 — Premium CRM UI redesign (checkpoint-based) ✅ Complete
 
 Design-system + composition pass; no DB/RLS/WhatsApp/billing/AI logic or
 route-contract changes. See [docs/ui/M05_UI_DIRECTION.md](docs/ui/M05_UI_DIRECTION.md).
@@ -290,7 +290,19 @@ route-contract changes. See [docs/ui/M05_UI_DIRECTION.md](docs/ui/M05_UI_DIRECTI
   billing/entitlement/Dodo logic, form behavior, and `?tab=` routing
   preserved. Checks: typecheck ✅, lint ✅ (37 warnings), test ✅ 936/92,
   build ✅. Commit `feat(m05e): billing and settings polish`.
-- M05F (contacts/templates light polish) — pending.
+- **M05F — contacts / templates polish ✅**: contacts table elevated with
+  emerald-tinted selected rows + tinted initial avatars; template category
+  chips recoloured theme-aware (Marketing=emerald, Utility=blue,
+  Authentication=amber) across the manager + wizard step 1; template/quick-
+  reply status/error/delete colours + `bg-red-950` boxes made theme-aware;
+  step-1 template cards + quick-reply rows elevated. Restyle only — CSV
+  import, dedup, CRUD, template submit/sync/validation, and the AI-writer
+  wiring preserved. Checks: typecheck ✅, lint ✅ (37 warnings), test ✅
+  936/92, build ✅. Commit `feat(m05f): contacts and templates polish`.
+
+**M05 done** — the full premium light+emerald redesign shipped across the
+app shell, inbox, campaign wizard + AI writer, dashboard, billing/settings,
+and contacts/templates. Next: M06 (India-first onboarding).
 
 ---
 

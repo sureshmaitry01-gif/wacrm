@@ -46,8 +46,8 @@ are copied.
 | **M05B** | Shared inbox redesign (filters · list · thread · customer panel) | ✅ done |
 | **M05C** | Campaign wizard redesign + AI writer composer UI | ✅ done |
 | **M05D** | Dashboard / analytics polish (KPI cards, charts) | ✅ done |
-| **M05E** | Billing / settings polish | ✅ this pass |
-| M05F | Contacts / templates light polish | ⏳ |
+| **M05E** | Billing / settings polish | ✅ done |
+| **M05F** | Contacts / templates light polish | ✅ **done — M05 COMPLETE** |
 
 Each checkpoint keeps all four checks green and is committed separately
 (`feat(m05x): …`).
@@ -161,6 +161,43 @@ effort concentrated on the billing panel.
   status colours in `whatsapp-config` and `members-tab` (and a
   destructive-button's `border-red-900`/`bg-red-950`) made theme-aware
   (`-600 dark:-400`) so they read on the light canvas.
+
+## M05F — what changed (contacts / templates / quick replies)
+
+Final checkpoint. Restyle only — CSV import, dedup, contact CRUD,
+tags/custom-fields, template submit/sync/validation, the M05C AI-writer
+wiring, and quick-reply CRUD all preserved.
+
+- **M05F-2 · contacts** — the contacts table is now an elevated white card
+  (`bg-card shadow-card`); **selected rows carry an emerald tint**; the name
+  cell gains a **tinted initial avatar**; `text-red-400` asterisks / delete
+  hovers / import warnings made theme-aware.
+- **M05F-3 · templates** — category chips (template-manager + the wizard's
+  step 1) recoloured to a consistent, theme-aware set (**Marketing =
+  emerald**, Utility = blue, Authentication = amber); quality-score colours,
+  the rejection-reason error box (`bg-red-950/20` → soft `bg-red-500/10`),
+  and delete-hover backgrounds made theme-aware; step-1 template cards
+  elevated with a hover lift. Template list rows already used the elevated
+  `Card` primitive.
+- **M05F-4 · quick replies** — rows elevated (`shadow-card`); the
+  delete-button `-400/-300` colours made theme-aware.
+
+## ✅ M05 complete — final visual system
+
+- **Mode:** light-first (soft-gray canvas, white cards); dark fully
+  supported. **Accent:** emerald default (brand / selected / WhatsApp /
+  primary actions), plus violet/cobalt/amber/rose selectable.
+- **AI = indigo** (`--ai`), reserved for AI surfaces only (inbox AI banner,
+  AI campaign writer) — never competing with the emerald brand.
+- **Semantics:** green = positive/healthy, amber = warning, red = problem —
+  all theme-aware (`-500` or `-600 dark:-400`), **decoupled from the brand
+  accent** (a positive trend stays green under any accent).
+- **Surfaces:** white cards, thin ring/border, calm `shadow-card`
+  elevation, `rounded-xl`, generous spacing. No doodles, gradients, or
+  glass.
+- **Screens covered:** app shell + primitives (A), shared inbox (B),
+  campaign wizard + AI writer (C), dashboard/analytics (D), billing/settings
+  (E), contacts/templates/quick-replies (F).
 
 ## Guardrails (whole milestone)
 
