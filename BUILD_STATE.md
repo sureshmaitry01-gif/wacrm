@@ -29,7 +29,7 @@ of every milestone.
 | **M00B** | Fork hygiene + SaaS conversion foundation | ✅ **Complete** |
 | **M01** | Vercel/serverless hardening, rate limiting, monitoring foundation | ✅ **Complete** |
 | **M02** | Dodo Payments + plan entitlements | ✅ **Complete** |
-| M03 | DeepSeek platform AI + metering | ⏳ Not started |
+| **M03** | DeepSeek platform AI + metering | ✅ **Complete** |
 | M04 | Campaign economics: cost calculator, quality score, AI campaign writer | ⏳ Not started |
 | M05 | Premium CRM UI redesign | ⏳ Not started |
 | M06 | India-first onboarding | ⏳ Not started |
@@ -168,6 +168,48 @@ local dev/tests run normally.
 Dodo account is connected. See `docs/billing/DODO.md` §6 before go-live.
 
 Committed as `feat(m02): dodo payments and plan entitlements`.
+
+## M03 — DeepSeek platform AI + metering ✅
+
+Converts AI from primarily BYO into a platform-AI foundation on DeepSeek
+V4 Flash, metered against the M02 plan credits. BYO (OpenAI/Anthropic)
+unchanged. Campaign writer / quality score / cost calculator are **M04**.
+
+**Delivered:**
+
+- **DeepSeek adapter** (`providers/deepseek.ts`) behind the existing
+  `src/lib/ai` abstraction (OpenAI-compatible, `max_tokens`, configurable
+  base URL); `AiProvider` union + `generate.ts` dispatch + default model
+  extended.
+- **Platform config** (`platform.ts`) — server-side key from env, never
+  client-exposed; `DEEPSEEK_MODEL` / `DEEPSEEK_BASE_URL` overridable.
+- **Runtime resolver** (`runtime.ts`) — one place decides platform vs BYO:
+  active BYO key wins (enterprise/self-host), else platform DeepSeek, else
+  none. Only platform mode is metered.
+- **Quota enforcement** — 1 request = 1 credit against
+  `ai_monthly_credits_limit` via M02 `consumeQuota`, consumed before the
+  provider call. Draft → 402 upgrade-required on exceed; auto-reply →
+  safe skip (left for a human). Fails open.
+- **Migration `041`** — the only schema change: relax `ai_usage_log`
+  provider CHECK to allow `deepseek`. Credit ledger reuses M02
+  `usage_counters`.
+- **UI fix** — BYO settings typed to `ByoProvider` (openai/anthropic);
+  DeepSeek is platform-only, not pasteable.
+- **Docs** — `docs/ai/DEEPSEEK.md`.
+
+**Verification (this milestone, captured 2026-08-26):**
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✅ pass (exit 0) — clean (one union-driven error found + fixed) |
+| `npm run lint` | ✅ pass (exit 0) — 0 errors, 37 warnings (pre-existing, unchanged) |
+| `npm run test` | ✅ pass (exit 0) — **897 passed / 88 files** (+19) |
+| `npm run build` | ✅ pass (exit 0) |
+
+⚠️ Migrations 040–041 not yet applied to a live DB; DeepSeek model id /
+API contract unverified against live docs — see `docs/ai/DEEPSEEK.md` §7.
+
+Committed as `feat(m03): deepseek platform ai and metering`.
 
 ---
 

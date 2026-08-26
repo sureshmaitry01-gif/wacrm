@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
-import { loadAiConfig } from '@/lib/ai/config'
+import { resolveAiRuntime } from '@/lib/ai/runtime'
 import { buildConversationContext } from '@/lib/ai/context'
 import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { generateReply } from '@/lib/ai/generate'
@@ -10,6 +10,7 @@ import { latestUserMessage } from '@/lib/ai/query'
 import { logAiUsage } from '@/lib/ai/usage'
 import { supabaseAdmin } from '@/lib/ai/admin-client'
 import { AiError } from '@/lib/ai/types'
+import { consumeQuota, upgradeRequiredResponse } from '@/lib/billing/entitlements'
 
 /**
  * POST /api/ai/draft  (agent+)
@@ -58,15 +59,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    const config = await loadAiConfig(supabase, accountId).catch((err) => {
-      // Decrypt failure — surface distinctly from "not configured".
-      console.error('[ai/draft] loadAiConfig error:', err)
+    // Resolve which AI serves this account: an active BYO key wins,
+    // otherwise platform AI (DeepSeek) if configured. See lib/ai/runtime.
+    const runtime = await resolveAiRuntime(supabase, accountId).catch((err) => {
+      // Decrypt failure on a BYO key — surface distinctly from "not set up".
+      console.error('[ai/draft] resolveAiRuntime error:', err)
       throw new AiError('Stored API key could not be decrypted.', {
         code: 'key_decrypt_failed',
         status: 400,
       })
     })
-    if (!config) {
+    if (!runtime) {
       return NextResponse.json(
         {
           error: 'AI assistant is not set up. Enable it in Settings → AI Assistant.',
@@ -75,6 +78,7 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
+    const { config, mode } = runtime
 
     const messages = await buildConversationContext(supabase, conversationId)
     // Nothing to draft from — a brand-new thread with no customer text
@@ -103,6 +107,19 @@ export async function POST(request: Request) {
       mode: 'draft',
       knowledge,
     })
+
+    // Platform AI is metered against the plan's AI credit quota (M02
+    // billing). 1 request = 1 credit for now (token-based metering is a
+    // documented follow-up). Consumed BEFORE the provider call so an
+    // out-of-credits account never spends the platform key; a clear 402
+    // upgrade-required response drives the UI to the billing page. BYO
+    // callers pay their own provider, so they're not metered here.
+    if (mode === 'platform') {
+      const credit = await consumeQuota(supabase, accountId, 'ai_monthly_credits_limit', 1)
+      if (!credit.allowed) {
+        return upgradeRequiredResponse(credit)
+      }
+    }
 
     const { text, usage } = await generateReply({ config, systemPrompt, messages })
 

@@ -38,12 +38,16 @@ const MASKED_KEY = '••••••••••••••••';
 // unassigned" choice gets a sentinel that maps to null in the payload.
 const HANDOFF_QUEUE = '__queue__';
 
-const PROVIDER_LABEL: Record<AiProvider, string> = {
+// BYO settings only support openai/anthropic — DeepSeek is the platform
+// provider (server-side key, not pasteable here). See lib/ai/platform.ts.
+type ByoProvider = Exclude<AiProvider, 'deepseek'>;
+
+const PROVIDER_LABEL: Record<ByoProvider, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic (Claude)',
 };
 
-const KEY_PLACEHOLDER: Record<AiProvider, string> = {
+const KEY_PLACEHOLDER: Record<ByoProvider, string> = {
   openai: 'sk-...',
   anthropic: 'sk-ant-...',
 };
@@ -59,7 +63,7 @@ export function AiConfig() {
   const [removing, setRemoving] = useState(false);
 
   const [configured, setConfigured] = useState(false);
-  const [provider, setProvider] = useState<AiProvider>('openai');
+  const [provider, setProvider] = useState<ByoProvider>('openai');
   const [model, setModel] = useState(AI_PROVIDER_DEFAULT_MODEL.openai);
   const [apiKey, setApiKey] = useState('');
   const [keyEdited, setKeyEdited] = useState(false);
@@ -126,7 +130,7 @@ export function AiConfig() {
 
   // Swap the model default when the provider changes, unless the user
   // typed a custom model.
-  const handleProviderChange = (next: AiProvider) => {
+  const handleProviderChange = (next: ByoProvider) => {
     setProvider(next);
     const isDefaultModel =
       model === AI_PROVIDER_DEFAULT_MODEL.openai ||
@@ -270,7 +274,7 @@ export function AiConfig() {
                 <Label>{t('provider')}</Label>
                 <Select
                   value={provider}
-                  onValueChange={(v) => handleProviderChange(v as AiProvider)}
+                  onValueChange={(v) => handleProviderChange(v as ByoProvider)}
                   disabled={disabled}
                 >
                   <SelectTrigger>

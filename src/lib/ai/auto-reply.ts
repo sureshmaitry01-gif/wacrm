@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './admin-client'
-import { loadAiConfig } from './config'
+import { resolveAiRuntime } from './runtime'
 import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
 import { generateReply } from './generate'
@@ -9,6 +9,7 @@ import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { consumeQuota } from '@/lib/billing/entitlements'
 
 interface DispatchArgs {
   /** Tenancy key — drives config, contact, and whatsapp_config lookups. */
@@ -47,8 +48,9 @@ export async function dispatchInboundToAiReply(
   try {
     const db = supabaseAdmin()
 
-    const config = await loadAiConfig(db, accountId)
-    if (!config || !config.autoReplyEnabled) return
+    const runtime = await resolveAiRuntime(db, accountId)
+    if (!runtime || !runtime.config.autoReplyEnabled) return
+    const { config, mode } = runtime
 
     // Deterministic, user-configured responders win over the LLM — the
     // caller already excludes messages a Flow consumed. Message-level
@@ -111,6 +113,21 @@ export async function dispatchInboundToAiReply(
       mode: 'auto_reply',
       knowledge,
     })
+
+    // Platform AI is metered against the plan's AI credit quota. Consumed
+    // before the provider call so an out-of-credits account never spends
+    // the platform key. On exceed we SKIP safely — the inbound stays in the
+    // inbox for a human (never a customer-facing error). BYO auto-reply is
+    // not metered (the account pays its own provider).
+    if (mode === 'platform') {
+      const credit = await consumeQuota(db, accountId, 'ai_monthly_credits_limit', 1)
+      if (!credit.allowed) {
+        console.warn(
+          `[ai auto-reply] account ${accountId} is out of AI credits — skipping; left for a human.`,
+        )
+        return
+      }
+    }
 
     const { text, handoff, usage } = await generateReply({
       config,

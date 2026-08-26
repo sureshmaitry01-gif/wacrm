@@ -38,11 +38,12 @@ Per-milestone scope, deliverables, and exit criteria. Status is tracked in
 - **Exit:** ✅ All checks green (typecheck, lint, test 878/84, build). Committed `feat(m02): dodo payments and plan entitlements`.
 - **Deferred:** dunning/grace (M07), proration, gating beyond the one surface, billing UI polish (M05), customer portal. **Migration not yet applied to a live DB; Dodo assumptions unverified — see `docs/billing/DODO.md` §6.**
 
-## M03 — DeepSeek platform AI + metering ⏳
-- **Scope:** Platform-provided AI, metered to plan quotas from M02.
-- **Planned work:** `providers/deepseek.ts` adapter (OpenAI-compatible); extend `AiProvider` + dispatch; platform-key mode alongside BYO; wire `ai_usage_log` → quota enforcement; per-plan model/token tiers.
-- **Note:** Confirm the exact DeepSeek model id/API against live DeepSeek docs before coding.
-- **Exit:** AI works without user keys, capped by plan; all checks green.
+## M03 — DeepSeek platform AI + metering ✅ Complete
+- **Scope:** Platform-provided AI on DeepSeek V4 Flash, metered to M02 plan quotas. BYO preserved.
+- **Delivered:** `providers/deepseek.ts` adapter (OpenAI-compatible, configurable base URL); `AiProvider` union + dispatch + default model extended; `platform.ts` (server-side key config) + `runtime.ts` (platform-vs-BYO resolver); 1-credit-per-request quota via M02 `consumeQuota` on the draft (402) and auto-reply (safe skip) paths; migration `041` (relax `ai_usage_log` provider CHECK — the only schema change); BYO settings UI typed to `ByoProvider`; `docs/ai/DEEPSEEK.md`.
+- **Design notes:** platform-first for normal accounts, active BYO key wins as the enterprise/self-host escape hatch. Both metering helpers fail open. Coarse metering (1 request = 1 credit); token-weighting deferred. Platform auto-reply defaults off (no per-account platform auto-reply settings surface yet).
+- **Exit:** ✅ All checks green (typecheck, lint, test 897/88, build). Committed `feat(m03): deepseek platform ai and metering`.
+- **Deferred:** per-account mode toggle + platform auto-reply settings (UX + schema), token-based metering, playground on platform, richer `ai_usage_log` status columns. **DeepSeek model id/API unverified against live docs — see `docs/ai/DEEPSEEK.md` §7.**
 
 ## M04 — Campaign economics ⏳
 - **Scope:** The differentiated features.
