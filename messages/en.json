@@ -137,6 +137,7 @@
       "whatsappNotConnected": "WhatsApp® is not connected. Go to Settings to connect your account."
     },
     "conversationList": {
+      "title": "Inbox",
       "searchPlaceholder": "Search conversations...",
       "filterAll": "All",
       "filterUnread": "Unread",

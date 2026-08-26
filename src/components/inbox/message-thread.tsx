@@ -138,16 +138,15 @@ const STATUS_OPTIONS: { label: string; value: ConversationStatus; color: string 
 ];
 
 /**
- * WhatsApp-style doodle background applied to the chat area (both the
- * active thread and the empty state). The SVG tile lives at
- * `/public/inbox-doodle.svg`; the slate-950 colour sits underneath so
- * the doodles read as a subtle pattern rather than a stark grid.
+ * Chat-area canvas (both the active thread and the empty state). A clean
+ * soft-gray surface — the premium support-CRM look (M05B) — so the emerald
+ * outbound bubbles and white inbound cards read as elevated. Deliberately
+ * NOT the old WhatsApp-style doodle tile: this is a CRM, not a WhatsApp
+ * clone.
  *
- * Defined once at module scope so the two render paths can't drift —
- * if we ever switch the asset, both spots update together.
+ * Defined once at module scope so the two render paths can't drift.
  */
-const DOODLE_BG_CLASSES =
-  "bg-background bg-[url('/inbox-doodle.svg')] bg-repeat";
+const THREAD_BG_CLASSES = "bg-background";
 
 export function MessageThread({
   conversation,
@@ -865,7 +864,7 @@ export function MessageThread({
   // pattern under the user's eye.
   if (!conversation || !contact) {
     return (
-      <div className={cn("flex flex-1 flex-col items-center justify-center", DOODLE_BG_CLASSES)}>
+      <div className={cn("flex flex-1 flex-col items-center justify-center", THREAD_BG_CLASSES)}>
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
           <MessageSquare className="h-8 w-8 text-muted-foreground" />
         </div>
@@ -899,7 +898,7 @@ export function MessageThread({
     // clipped and the hover toolbar overlaps the Tags panel. Letting the
     // root shrink lets the bubbles' break-words / max-w caps apply.
     // Issue #257.
-    <div className={cn("flex min-w-0 flex-1 flex-col", DOODLE_BG_CLASSES)}>
+    <div className={cn("flex min-w-0 flex-1 flex-col", THREAD_BG_CLASSES)}>
       {/* Header — solid card surface sits on top of the doodle so the
           name/avatar/dropdowns stay legible. */}
       <div className="flex items-center justify-between gap-2 border-b border-border bg-card px-3 py-3 sm:px-4">
@@ -916,7 +915,7 @@ export function MessageThread({
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
             {displayName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">

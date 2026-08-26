@@ -217,52 +217,54 @@ export function ConversationList({
     [onSelect]
   );
 
-  const activeFilter = FILTER_OPTIONS.find((o) => o.value === filter);
-
   return (
     // w-full on mobile so the list occupies the whole viewport when it's
     // the single pane showing; fixed 320px on desktop where it shares the
     // row with the thread + contact sidebar.
     <div className="flex h-full w-full flex-col border-r border-border bg-card lg:w-80">
-      {/* Search + Filter */}
-      <div className="space-y-2 border-b border-border p-3">
+      {/* Header + Search + Filter */}
+      <div className="space-y-3 border-b border-border p-3">
+        {/* List title + live count — gives the pane a premium
+            support-CRM header instead of starting cold on the search box. */}
+        <div className="flex items-center justify-between px-0.5 pt-0.5">
+          <h2 className="text-sm font-semibold text-foreground">{t("title")}</h2>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            {filtered.length}
+          </span>
+        </div>
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={handleSearchChange}
             placeholder={t("searchPlaceholder")}
-            className="border-border bg-muted pl-9 text-sm text-foreground placeholder-muted-foreground focus:border-primary/50"
+            className="rounded-lg border-border bg-muted pl-9 text-sm text-foreground placeholder-muted-foreground focus:border-primary/50"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center justify-center h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
-                {activeFilter?.label ?? t("filterAll")}
-                <ChevronDown className="h-3 w-3" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="border-border bg-popover"
+        {/* Status filter — segmented pills (same `filter` state as before).
+            More scannable than a dropdown for five short options, and the
+            active pill carries the emerald accent. */}
+        <div className="flex flex-wrap gap-1">
+          {FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setFilter(opt.value)}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                filter === opt.value
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
             >
-              {FILTER_OPTIONS.map((opt) => (
-                <DropdownMenuItem
-                  key={opt.value}
-                  onClick={() => setFilter(opt.value)}
-                  className={cn(
-                    "text-sm",
-                    filter === opt.value
-                      ? "text-primary"
-                      : "text-popover-foreground"
-                  )}
-                >
-                  {opt.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              {opt.label}
+            </button>
+          ))}
+        </div>
 
+        <div className="flex flex-wrap items-center gap-1">
           {tags.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -406,7 +408,7 @@ export function ConversationList({
             <p className="text-sm text-muted-foreground">{t("noConversations")}</p>
           </div>
         ) : (
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-0.5 py-2">
             {filtered.map((conv) => (
               <ConversationItem
                 key={conv.id}
@@ -450,41 +452,67 @@ function ConversationItem({
       })
     : "";
 
+  const isUnread = conversation.unread_count > 0;
+
   return (
     <button
       onClick={handleClick}
       className={cn(
-        "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
-        isActive && "border-l-2 border-primary bg-muted/70"
+        // Inset rounded rows so the selected state reads as a soft
+        // emerald-tinted card (premium support-CRM look) rather than a
+        // full-bleed highlight.
+        "mx-2 flex items-start gap-3 rounded-lg px-2.5 py-2.5 text-left transition-colors",
+        isActive
+          ? "bg-primary/10 ring-1 ring-primary/20"
+          : "hover:bg-muted/60",
       )}
     >
-      {/* Avatar */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
-        {contact?.avatar_url ? (
-          <img
-            src={contact.avatar_url}
-            alt={displayName}
-            className="h-10 w-10 rounded-full object-cover"
-          />
-        ) : (
-          initials
+      {/* Avatar — tinted fallback for a warmer, on-brand look. */}
+      <div className="relative shrink-0">
+        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-semibold text-primary">
+          {contact?.avatar_url ? (
+            <img
+              src={contact.avatar_url}
+              alt={displayName}
+              className="h-10 w-10 rounded-full object-cover"
+            />
+          ) : (
+            initials
+          )}
+        </div>
+        {/* Unread dot on the avatar — an at-a-glance cue independent of
+            the count pill. */}
+        {isUnread && (
+          <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-card bg-primary" />
         )}
       </div>
 
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">
+          <span
+            className={cn(
+              "truncate text-sm",
+              isUnread
+                ? "font-semibold text-foreground"
+                : "font-medium text-foreground",
+            )}
+          >
             {displayName}
           </span>
           <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-2">
-          <p className="truncate text-xs text-muted-foreground">
+          <p
+            className={cn(
+              "truncate text-xs",
+              isUnread ? "text-foreground/80" : "text-muted-foreground",
+            )}
+          >
             {conversation.last_message_text || t("noMessagesYet")}
           </p>
           <div className="flex shrink-0 items-center gap-1.5">
-            {conversation.unread_count > 0 && (
+            {isUnread && (
               <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
                 {conversation.unread_count}
               </span>

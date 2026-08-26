@@ -239,10 +239,13 @@ export function MessageBubble({
     >
       <div
         className={cn(
+          // Outbound = emerald fill (the WhatsApp affordance); inbound =
+          // white card with a thin ring + calm shadow so it reads as an
+          // elevated message on the soft-gray thread canvas (M05B).
           "relative rounded-2xl px-3 py-2",
           isAgent
-            ? "rounded-br-md bg-primary text-primary-foreground"
-            : "rounded-bl-md bg-muted text-foreground",
+            ? "rounded-br-md bg-primary text-primary-foreground shadow-sm"
+            : "rounded-bl-md bg-card text-foreground ring-1 ring-border shadow-card",
         )}
       >
         {reply && (

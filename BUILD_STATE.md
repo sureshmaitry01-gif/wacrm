@@ -248,6 +248,24 @@ Meta's live rate card before production. See `docs/campaigns/ECONOMICS.md`.
 
 Committed as `feat(m04): campaign economics writer quality and cost`.
 
+## M05 — Premium CRM UI redesign (checkpoint-based) 🔄 In progress
+
+Design-system + composition pass; no DB/RLS/WhatsApp/billing/AI logic or
+route-contract changes. See [docs/ui/M05_UI_DIRECTION.md](docs/ui/M05_UI_DIRECTION.md).
+
+- **M05A — design foundation ✅** (`b66c1cf`): light-first + emerald default,
+  AI indigo accent token, calm card shadows, softer canvas, sticky top bar.
+- **M05B — shared inbox ✅**: premium three-pane inbox — list header +
+  segmented emerald filter pills + inset rounded rows; clean soft-gray
+  thread canvas (dropped the WhatsApp doodle) with white inbound cards +
+  emerald outbound + circular send; tinted/ringed customer-panel avatar;
+  AI thread banner on the reserved indigo accent. Restyle only — inbox
+  data flow / realtime / send / assignment preserved. Checks: typecheck ✅,
+  lint ✅ (37 warnings), test ✅ 936/92, build ✅. Commit
+  `feat(m05b): premium shared inbox redesign`.
+- M05C–F (campaign wizard + AI writer UI, dashboard, billing/settings,
+  contacts/templates) — pending.
+
 ---
 
 ## Guardrails in force (see AGENTS.md for the authoritative list)

@@ -161,9 +161,9 @@ export function AiThreadBanner({
 
   // Active on this thread.
   return (
-    <Banner tone="primary">
+    <Banner tone="ai">
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
-        <Sparkles className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
+        <Sparkles className="h-3.5 w-3.5 flex-shrink-0 text-ai" />
         <span className="truncate font-medium text-foreground">
           {t("activeText")}
         </span>
@@ -179,15 +179,17 @@ function Banner({
   tone,
   children,
 }: {
-  tone: "primary" | "muted";
+  tone: "ai" | "muted";
   children: React.ReactNode;
 }) {
   return (
     <div
       className={cn(
         "flex items-center gap-3 border-b px-3 py-2 text-xs sm:px-4",
-        tone === "primary"
-          ? "border-primary/20 bg-primary/5"
+        // AI surfaces carry the reserved indigo accent (M05), distinct
+        // from the emerald brand.
+        tone === "ai"
+          ? "border-ai/20 bg-ai-soft"
           : "border-border bg-muted/40",
       )}
     >

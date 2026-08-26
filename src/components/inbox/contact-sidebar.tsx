@@ -136,7 +136,7 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
         <div className="p-4">
           {/* Contact Info */}
           <div className="flex flex-col items-center text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-lg font-semibold text-foreground">
+            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-lg font-semibold text-primary ring-1 ring-primary/15">
               {contact.avatar_url ? (
                 <img
                   src={contact.avatar_url}

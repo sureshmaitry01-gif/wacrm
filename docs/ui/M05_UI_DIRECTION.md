@@ -42,8 +42,8 @@ are copied.
 
 | # | Scope | Status |
 |---|---|---|
-| **M05A** | Design tokens + app-shell/primitive foundation | ✅ this pass |
-| M05B | Shared inbox redesign (filters · list · thread · customer panel) | ⏳ |
+| **M05A** | Design tokens + app-shell/primitive foundation | ✅ done |
+| **M05B** | Shared inbox redesign (filters · list · thread · customer panel) | ✅ this pass |
 | M05C | Campaign wizard redesign + AI writer composer UI | ⏳ |
 | M05D | Dashboard / analytics polish (KPI cards, charts) | ⏳ |
 | M05E | Billing / settings polish | ⏳ |
@@ -74,6 +74,30 @@ because every component already consumes semantic tokens (`bg-card`,
 
 **Not** in M05A: per-screen redesigns (inbox, wizard, dashboard, billing,
 contacts) — those are M05B–F.
+
+## M05B — what changed (shared inbox)
+
+Restyle only — no change to inbox data flow, realtime, send, assignment,
+or conversation-resolution logic; the three-pane responsive layout (owned
+by the page) is preserved. Worked in sub-steps:
+
+- **M05B-1 · list** — added a list header (title + live count); the status
+  filter became **segmented emerald pills** (same `filter` state, was a
+  dropdown); conversation rows are now **inset rounded cards** with a soft
+  emerald selected state (ring + tint), **tinted avatar** fallbacks, an
+  **unread dot** on the avatar, and bolder unread rows.
+- **M05B-2 · thread + composer** — replaced the **WhatsApp-style doodle
+  canvas with a clean soft-gray surface** (`THREAD_BG_CLASSES`) so bubbles
+  read as elevated; **inbound bubbles are now white cards** (thin ring +
+  calm shadow), outbound stay emerald (the WhatsApp affordance); tinted
+  thread-header avatar; **circular emerald send** button.
+- **M05B-3 · customer panel** — tinted, ringed contact avatar for
+  consistency; the panel keeps its clean sectioned layout (tags · deals ·
+  notes).
+- **M05B-4 · polish** — AI thread banner retinted to the **reserved indigo
+  AI accent** (first real consumer of the `--ai` token — `text-ai` /
+  `bg-ai-soft`); fixed the WhatsApp-not-connected banner's amber contrast
+  for light mode.
 
 ## Guardrails (whole milestone)
 
