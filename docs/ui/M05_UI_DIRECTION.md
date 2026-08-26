@@ -45,8 +45,8 @@ are copied.
 | **M05A** | Design tokens + app-shell/primitive foundation | ✅ done |
 | **M05B** | Shared inbox redesign (filters · list · thread · customer panel) | ✅ done |
 | **M05C** | Campaign wizard redesign + AI writer composer UI | ✅ done |
-| **M05D** | Dashboard / analytics polish (KPI cards, charts) | ✅ this pass |
-| M05E | Billing / settings polish | ⏳ |
+| **M05D** | Dashboard / analytics polish (KPI cards, charts) | ✅ done |
+| **M05E** | Billing / settings polish | ✅ this pass |
 | M05F | Contacts / templates light polish | ⏳ |
 
 Each checkpoint keeps all four checks green and is committed separately
@@ -140,6 +140,27 @@ behavior preserved. Every widget already shared the
 - **M05D-4 · activity + states** — activity feed gets `shadow-card`; its
   kind badges and the quick-action tints fixed to `-600 dark:-400` so
   amber/blue/rose read on the light canvas.
+
+## M05E — what changed (billing / settings)
+
+Restyle only — all form behavior, validation, submit, `?tab=` routing,
+billing/entitlement logic, and Dodo internals preserved. The rail,
+panel-head, and overview were already premium (M05A-era redesign), so the
+effort concentrated on the billing panel.
+
+- **M05E-2 · overview** — status tiles gain `shadow-card` + a subtle
+  hover-lift, matching the dashboard/wizard.
+- **M05E-3 · billing** — the M02 "deliberately unpolished" panel got its
+  visual pass: a **hero current-plan card** (plan name + soft status pill
+  + price), a **usage section with progress bars** (emerald → amber → red
+  as usage nears the limit; "Unlimited" renders no bar), and **plan rows**
+  with the current plan emerald-highlighted and emerald upgrade CTAs.
+  Presentation only — the `/api/billing/*` calls, checkout redirect, and
+  admin-gating are unchanged.
+- **M05E-4 · other panels** — light-consistency fixes: dark-tuned `-400`
+  status colours in `whatsapp-config` and `members-tab` (and a
+  destructive-button's `border-red-900`/`bg-red-950`) made theme-aware
+  (`-600 dark:-400`) so they read on the light canvas.
 
 ## Guardrails (whole milestone)
 

@@ -282,7 +282,15 @@ route-contract changes. See [docs/ui/M05_UI_DIRECTION.md](docs/ui/M05_UI_DIRECTI
   calculations / chart geometry preserved. Checks: typecheck ✅, lint ✅
   (37 warnings), test ✅ 936/92, build ✅. Commit
   `feat(m05d): dashboard analytics polish`.
-- M05E–F (billing/settings, contacts/templates) — pending.
+- **M05E — billing / settings polish ✅**: overview status tiles elevated;
+  the M02 billing panel got its premium pass — hero current-plan card
+  (status pill + price), usage progress bars (emerald→amber→red), and
+  emerald-highlighted plan rows with upgrade CTAs; light-contrast fixes to
+  `whatsapp-config` / `members-tab` status colours. Presentation only —
+  billing/entitlement/Dodo logic, form behavior, and `?tab=` routing
+  preserved. Checks: typecheck ✅, lint ✅ (37 warnings), test ✅ 936/92,
+  build ✅. Commit `feat(m05e): billing and settings polish`.
+- M05F (contacts/templates light polish) — pending.
 
 ---
 
