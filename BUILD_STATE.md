@@ -33,7 +33,7 @@ of every milestone.
 | **M04** | Campaign economics: cost calculator, quality score, AI campaign writer | ✅ **Complete** |
 | **M05** | Premium CRM UI redesign | ✅ **Complete** |
 | **M06** | India-first onboarding | ✅ **Complete** |
-| M07 | Beta readiness | ⏳ Not started |
+| **M07** | Beta readiness (A/B/C/D) | 🔄 **In progress** — B ✅, C ✅, A blocked, D pending |
 
 Full detail: [docs/conversion/MILESTONES.md](docs/conversion/MILESTONES.md).
 
@@ -325,6 +325,30 @@ highlight, and plain-English INR / no-markup / approval copy.
 - Guardrails: no WhatsApp/Dodo/DeepSeek/quota/RLS internals, no Drizzle, no
   new deps. Checks: typecheck ✅, lint ✅ (37 warnings), test ✅ 946/93,
   build ✅. Commit `feat(m06): india-first onboarding`.
+
+## M07 — Beta readiness (A/B/C/D)
+
+Launch hardening, split into four sub-milestones (full detail in
+[docs/conversion/MILESTONES.md](docs/conversion/MILESTONES.md)):
+
+- **M07A — provider-contract verification** ⏳ **Blocked** on real
+  DeepSeek/Dodo/Meta evidence. Not started.
+- **M07B — data & infra validation** ✅ **Complete** — migrations 040–041
+  validated on a real local Postgres; strengthened `verify-schema.sql` +
+  cross-tenant `rls-smoke.sql` proving isolation; committed `68fcf28`,
+  pushed.
+- **M07C — monitoring + operational hardening** ✅ **Complete**: real
+  Sentry (`@sentry/nextjs`, server-side, errors-only, `sendDefaultPii:false`)
+  + PostHog (`posthog-node`, server-side) wired from the M01 seams with
+  `sanitizeProps` in-path; presentation-only dunning banner
+  (`on_hold`/`failed`/`expired`; the expired free-plan-fallback claim is
+  backed by `entitlements.ts`); broadcast-durability decision
+  ([docs/deployment/BROADCAST_DURABILITY.md](docs/deployment/BROADCAST_DURABILITY.md)).
+  Both integrations no-op when env unset; no billing/Dodo/DeepSeek/WhatsApp/
+  RLS/migration changes. Checks green (typecheck, lint, test 955/94, build).
+- **M07D — security review + beta launch checklist** ⏳ Not started (owns
+  the REVOKE-PUBLIC hardening, required-check, CSP-enforce, localization
+  decision, QA sign-off).
 
 ---
 

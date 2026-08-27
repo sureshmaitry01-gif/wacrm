@@ -1,26 +1,44 @@
-# Observability foundation (Sentry + PostHog)
+# Observability (Sentry + PostHog)
 
-Milestone **M01** adds a dependency-free, env-flagged **foundation** for
-error monitoring and product analytics. These are seams to adopt
-incrementally — not full integrations, and deliberately not yet wired into
-existing product code (M01 changes no product behavior).
+Env-flagged error monitoring + product analytics. Introduced as
+dependency-free seams in **M01**; **wired to the real SDKs in M07C**
+(server-side only).
 
 > Everything here is **no-op when its env var is unset**. Local dev and
-> self-host need no Sentry/PostHog account and pull in no SDK.
+> self-host need no Sentry/PostHog account — the SDKs are installed but
+> never initialised without the env vars.
 
 ## Modules
 
 `src/lib/observability/`:
 
 - **`sentry.ts`** — `captureException(err, ctx?)`, `captureMessage(msg, ctx?)`,
-  `isSentryEnabled()`. No-op unless `SENTRY_DSN` is set; when set, emits a
-  `[sentry]`-marked `console.error/warn` (captured by Vercel log drains).
-- **`analytics.ts`** — `captureEvent(event, props?)`, `sanitizeProps(props)`,
-  `isAnalyticsEnabled()`. No-op unless `NEXT_PUBLIC_POSTHOG_KEY` is set;
-  when set, emits a `[posthog]`-marked `console.info`.
-- **`index.ts`** — re-exports both.
+  `isSentryEnabled()`. No-op unless `SENTRY_DSN` (server-only var) is set;
+  when set, forwards to `@sentry/nextjs`. `ctx` is PII-scrubbed (shared
+  denylist) before becoming Sentry `extra`.
+- **`analytics.ts`** — `captureEvent(event, props?)`, `isAnalyticsEnabled()`.
+  No-op unless `NEXT_PUBLIC_POSTHOG_KEY` is set; when set, forwards to
+  `posthog-node` (server-side, non-blocking). A `distinct_id` prop sets the
+  PostHog id; every event is `sanitizeProps`-scrubbed.
+- **`redact.ts`** — the shared PII denylist + `sanitizeProps` (used by both
+  seams; pure, pulls in no SDK).
+- **`index.ts`** — re-exports the public surface.
+
+Init lives in **`src/instrumentation.ts`** (`Sentry.init`, server + edge,
+errors-only, `sendDefaultPii: false`) — runs only when `SENTRY_DSN` is set.
 
 Import from `@/lib/observability`.
+
+### Scope (M07C) — server-side only
+
+No browser SDK, no Session Replay, no tracing (`tracesSampleRate: 0`), no
+source-map upload (`SENTRY_AUTH_TOKEN`/`withSentryConfig` deferred). Because
+neither integration makes a *client* network call, `next.config.ts`'s CSP
+`connect-src` needed no change. `SENTRY_DSN` is server-only, so the Sentry
+seam is inert in the browser by construction. The PostHog project key
+(`phc_…`) is a public ingestion key by design, so using
+`NEXT_PUBLIC_POSTHOG_KEY` server-side needs no separate secret var — the
+env contract is unchanged from M01.
 
 ## Privacy (read before adding any analytics)
 

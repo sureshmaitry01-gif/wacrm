@@ -1,20 +1,27 @@
 /**
- * Error-monitoring seam (Sentry foundation).
+ * Error-monitoring seam (Sentry) — wired in M07C.
  *
- * Dependency-free and env-flagged. When `SENTRY_DSN` is unset this is a
- * strict no-op, so local development and self-host deploys need no Sentry
- * account and pull in no SDK. When `SENTRY_DSN` is set, failures are
- * emitted to `console.error` with a `[sentry]` marker (captured by
- * Vercel's log drains) — and this is the single, obvious place to forward
- * to `@sentry/nextjs` once that SDK is installed and verified against
- * Next 16 (a later step; see `docs/observability/README.md`).
+ * Env-flagged: when `SENTRY_DSN` is unset this is a strict no-op, so local
+ * dev / self-host need no Sentry account (the SDK is imported but never
+ * initialised — its capture calls are safe no-ops until `Sentry.init` runs
+ * in `src/instrumentation.ts`, which only runs when the DSN is present).
  *
- * Intentionally minimal for M01: no release pipeline, no source-map
- * upload. This is a foundation to adopt at call sites incrementally, not a
- * full integration.
+ * `SENTRY_DSN` is a SERVER-only var (no `NEXT_PUBLIC_` prefix), so
+ * `isSentryEnabled()` is false in the browser — this seam therefore
+ * forwards to Sentry only on the server. That is intentional: M07C is a
+ * minimal, server-side-safe integration (no client bundle, no Replay, no
+ * tracing overhead, no source-map upload). See docs/observability/README.md.
+ *
+ * PII: init sets `sendDefaultPii: false` (no request headers/cookies/IP/
+ * body auto-captured); any `context` passed here is additionally run
+ * through the shared PII denylist before it becomes Sentry `extra`.
  */
 
-/** True when a Sentry DSN is provisioned. */
+import * as Sentry from '@sentry/nextjs'
+
+import { sanitizeProps } from './redact'
+
+/** True when a Sentry DSN is provisioned (server-only var). */
 export function isSentryEnabled(): boolean {
   return Boolean(process.env.SENTRY_DSN)
 }
@@ -25,8 +32,10 @@ export function captureException(
   context?: Record<string, unknown>,
 ): void {
   if (!isSentryEnabled()) return
-  // SEAM: forward to Sentry here once @sentry/nextjs is wired in.
-  console.error('[sentry] captureException', error, context ?? {})
+  Sentry.captureException(
+    error,
+    context ? { extra: sanitizeProps(context) } : undefined,
+  )
 }
 
 /** Report a non-error message/breadcrumb. No-op when not configured. */
@@ -35,6 +44,8 @@ export function captureMessage(
   context?: Record<string, unknown>,
 ): void {
   if (!isSentryEnabled()) return
-  // SEAM: forward to Sentry here once @sentry/nextjs is wired in.
-  console.warn('[sentry] captureMessage', message, context ?? {})
+  Sentry.captureMessage(message, {
+    level: 'info',
+    ...(context ? { extra: sanitizeProps(context) } : {}),
+  })
 }

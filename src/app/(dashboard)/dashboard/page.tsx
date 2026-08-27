@@ -34,6 +34,7 @@ import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import { OnboardingChecklist } from '@/components/dashboard/onboarding-checklist'
+import { PaymentStatusNotice } from '@/components/billing/payment-status-notice'
 
 import { useTranslations } from 'next-intl'
 
@@ -131,6 +132,10 @@ export default function DashboardPage() {
           {t('description')}
         </p>
       </div>
+
+      {/* Payment problem banner — presentation only; self-hides for
+          healthy accounts (M07C). */}
+      <PaymentStatusNotice />
 
       {/* First-run onboarding — self-hides once the account is set up or
           the user dismisses it (M06). */}

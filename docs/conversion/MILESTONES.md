@@ -62,7 +62,48 @@ Per-milestone scope, deliverables, and exit criteria. Status is tracked in
 - **Planned work:** streamlined WhatsApp connect (evaluate Meta Embedded Signup); guided first campaign; Hindi locale + INR/IST; India-localized copy.
 - **Exit:** A non-technical SMB can self-onboard; all checks green.
 
-## M07 — Beta readiness ⏳
-- **Scope:** Launch hardening.
-- **Planned work:** Meta throughput tiers in broadcasts; dunning/grace flows; Flows/Automations consolidation decision; cross-tenant security review (realtime RLS, entitlement helpers); docs.
-- **Exit:** Beta-ready; all checks green.
+## M07 — Beta readiness ⏳ (split into A/B/C/D)
+
+Launch hardening, sequenced so provider-contract verification and data/infra
+validation precede monitoring and the security/launch sign-off.
+
+### M07A — Provider-contract / external-service verification ⏳ Blocked
+- **Scope:** Verify, against live sources, the external contracts earlier
+  milestones assumed: DeepSeek model id / base URL / `max_tokens` (M03),
+  Dodo webhook signature scheme + header/field names + INR subscriptions
+  (M02), and the Meta India rate card (M04). Update adapters/config **only**
+  where a discrepancy is confirmed, behind the existing abstractions.
+- **Status:** **Blocked** pending real DeepSeek / Dodo / Meta evidence — not
+  started, not to be marked complete until that evidence exists.
+
+### M07B — Data & infrastructure validation ✅ Complete
+- **Delivered:** migrations 040–041 validated against a real local Postgres
+  from a clean `supabase db reset`; `verify-schema.sql` strengthened
+  (billing tables, RLS-enabled, `consume_quota`, seed trigger, 041 CHECK);
+  a cross-tenant RLS smoke test (`supabase/ci/rls-smoke.sql`) proving tenant
+  isolation, wired into `migrations.yml`. Committed `test(m07b): …`
+  (`68fcf28`), pushed.
+
+### M07C — Monitoring + operational hardening ✅ Complete
+- **Delivered:** real **Sentry** (`@sentry/nextjs`, server-side via
+  `src/instrumentation.ts`, errors-only, `sendDefaultPii:false`) forwarded
+  from the M01 seam; real **PostHog** (`posthog-node`, server-side,
+  non-blocking) from the analytics seam with a shared `sanitizeProps`
+  denylist (`redact.ts`) in-path; presentation-only **dunning** banner
+  (`PaymentStatusNotice`) for `on_hold`/`failed`/`expired`, with the
+  `expired` copy's free-plan-fallback claim backed by `entitlements.ts`
+  (lines 32/92/95); **broadcast durability** decision — retain resume, no
+  cron yet ([docs/deployment/BROADCAST_DURABILITY.md](../deployment/BROADCAST_DURABILITY.md));
+  this A/B/C/D structure persisted.
+- **Guardrails held:** no billing/Dodo/DeepSeek/WhatsApp/RLS/migration
+  changes; no M07D security-grant work; both integrations no-op when env
+  unset.
+- **Exit:** ✅ typecheck, lint (37 warnings), test 955/94, build all green.
+
+### M07D — Security review + beta launch checklist ⏳ Not started
+- **Scope:** `REVOKE EXECUTE … FROM PUBLIC, anon` on SECURITY-DEFINER RPCs;
+  make `migrations.yml` a required check; `supabase/.branches` `.temp`
+  gitignore hygiene; CSP `Report-Only` → enforce; cross-tenant security
+  sign-off; Hindi-localization go/no-go; QA + a beta-readiness assessment.
+
+- **Exit (whole milestone):** Beta-ready; all checks green.
