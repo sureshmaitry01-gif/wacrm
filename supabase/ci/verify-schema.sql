@@ -12,6 +12,8 @@
 -- build the schema", not a spec of it — asserting every column here
 -- would just be the migrations restated in a second place, drifting.
 DO $$
+DECLARE
+  t text;
 BEGIN
   -- The core tables, from 001.
   IF to_regclass('public.messages') IS NULL THEN
@@ -50,6 +52,40 @@ BEGIN
   END IF;
   IF to_regclass('public.usage_counters') IS NULL THEN
     RAISE EXCEPTION 'public.usage_counters is missing — migration 040 did not apply';
+  END IF;
+
+  -- RLS must be ENABLED on every billing table. A billing table without
+  -- RLS is a cross-tenant data leak, and IF-guarded migrations can silently
+  -- create a table while skipping its ALTER ... ENABLE ROW LEVEL SECURITY.
+  FOREACH t IN ARRAY ARRAY[
+    'billing_customers','subscriptions','entitlements',
+    'dodo_webhook_events','usage_counters'
+  ] LOOP
+    IF NOT COALESCE(
+      (SELECT relrowsecurity FROM pg_class WHERE oid = ('public.'||t)::regclass),
+      false
+    ) THEN
+      RAISE EXCEPTION 'RLS is not enabled on public.% (migration 040)', t;
+    END IF;
+  END LOOP;
+
+  -- The quota gate + the account seed path (040) are load-bearing.
+  IF to_regprocedure('public.consume_quota(uuid,text,integer,integer)') IS NULL THEN
+    RAISE EXCEPTION 'consume_quota(uuid,text,integer,integer) is missing (migration 040)';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'accounts_seed_billing') THEN
+    RAISE EXCEPTION 'accounts_seed_billing trigger is missing (migration 040)';
+  END IF;
+
+  -- 041 relaxed the ai_usage_log provider CHECK to admit platform DeepSeek.
+  -- If the ALTER silently no-op'd, deepseek usage logging would fail the
+  -- constraint at runtime.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.ai_usage_log'::regclass AND contype = 'c'
+      AND pg_get_constraintdef(oid) LIKE '%deepseek%'
+  ) THEN
+    RAISE EXCEPTION 'ai_usage_log provider CHECK does not allow deepseek (migration 041)';
   END IF;
 
   RAISE NOTICE 'schema verification passed';

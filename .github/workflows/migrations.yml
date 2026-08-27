@@ -69,3 +69,10 @@ jobs:
       # just the absence of an error.
       - name: Verify the resulting schema
         run: supabase db query --local --file supabase/ci/verify-schema.sql
+
+      # Existence + RLS-enabled is not the same as tenant isolation. This
+      # seeds two accounts and, acting as one tenant, proves it can read
+      # none of the other's billing rows (and exactly its own). A policy
+      # regression that opens a cross-tenant read fails the job here.
+      - name: Prove cross-tenant RLS isolation
+        run: supabase db query --local --file supabase/ci/rls-smoke.sql
