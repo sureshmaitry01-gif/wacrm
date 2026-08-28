@@ -88,6 +88,61 @@ BEGIN
     RAISE EXCEPTION 'ai_usage_log provider CHECK does not allow deepseek (migration 041)';
   END IF;
 
+  -- ----------------------------------------------------------
+  -- 042: SECURITY DEFINER execute hardening.
+  --
+  -- These assert least-privilege EXECUTE, which a GRANT alone does NOT
+  -- give you: Postgres grants EXECUTE to PUBLIC by default, and a later
+  -- GRANT is additive. If the REVOKEs in 042 silently no-op'd, these
+  -- RPCs would stay callable by anon/PUBLIC over PostgREST.
+  -- ----------------------------------------------------------
+
+  -- anon must NOT be able to execute the quota meter (it bypasses RLS on
+  -- usage_counters), the AI slot claimer, or the membership helper.
+  IF has_function_privilege('anon',
+       'public.consume_quota(uuid, text, integer, integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'anon can EXECUTE consume_quota (migration 042 REVOKE did not apply)';
+  END IF;
+  IF has_function_privilege('anon',
+       'public.claim_ai_reply_slot(uuid, integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'anon can EXECUTE claim_ai_reply_slot (migration 042 REVOKE did not apply)';
+  END IF;
+  IF has_function_privilege('anon',
+       'public.is_account_member(uuid, account_role_enum)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'anon can EXECUTE is_account_member (migration 042 REVOKE did not apply)';
+  END IF;
+
+  -- End users must never mutate the AI reply counter directly.
+  IF has_function_privilege('authenticated',
+       'public.claim_ai_reply_slot(uuid, integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'authenticated can EXECUTE claim_ai_reply_slot (should be service_role only)';
+  END IF;
+
+  -- seed_account_billing is trigger-only: no direct caller at all.
+  IF has_function_privilege('authenticated',
+       'public.seed_account_billing()', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.seed_account_billing()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'seed_account_billing is directly executable (should be trigger-only)';
+  END IF;
+
+  -- ...but the legitimate paths must KEEP working.
+  IF NOT has_function_privilege('authenticated',
+       'public.consume_quota(uuid, text, integer, integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'authenticated lost EXECUTE on consume_quota (app quota path broken)';
+  END IF;
+  IF NOT has_function_privilege('service_role',
+       'public.consume_quota(uuid, text, integer, integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role lost EXECUTE on consume_quota (engine quota path broken)';
+  END IF;
+  IF NOT has_function_privilege('service_role',
+       'public.claim_ai_reply_slot(uuid, integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'service_role lost EXECUTE on claim_ai_reply_slot (auto-reply broken)';
+  END IF;
+  IF NOT has_function_privilege('authenticated',
+       'public.is_account_member(uuid, account_role_enum)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'authenticated lost EXECUTE on is_account_member (every RLS policy breaks)';
+  END IF;
+
   RAISE NOTICE 'schema verification passed';
 END
 $$;

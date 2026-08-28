@@ -100,10 +100,40 @@ validation precede monitoring and the security/launch sign-off.
   unset.
 - **Exit:** ✅ typecheck, lint (37 warnings), test 955/94, build all green.
 
-### M07D — Security review + beta launch checklist ⏳ Not started
+### M07D — Security review + beta launch checklist ✅ Complete
 - **Scope:** `REVOKE EXECUTE … FROM PUBLIC, anon` on SECURITY-DEFINER RPCs;
   make `migrations.yml` a required check; `supabase/.branches` `.temp`
   gitignore hygiene; CSP `Report-Only` → enforce; cross-tenant security
   sign-off; Hindi-localization go/no-go; QA + a beta-readiness assessment.
+- **Delivered:**
+  - **Migration `042_secdef_execute_hardening.sql`** — fixes a **MEDIUM**
+    finding: `consume_quota` was SECURITY DEFINER, granted to
+    `authenticated`, and trusted caller-supplied `p_account_id`/`p_limit`,
+    so a signed-in user could meter/tamper **another tenant's** counters via
+    PostgREST. Proven exploitable on a live DB (negative control: victim
+    counter 42 → 47), fixed with an `is_account_member` check (mirroring
+    017), re-proven blocked while own-account metering still works. Also
+    revokes default PUBLIC/anon EXECUTE on `consume_quota`,
+    `claim_ai_reply_slot`, `is_account_member`, `seed_account_billing`.
+  - **Assertions + regression test** — `verify-schema.sql` asserts the
+    grants via `has_function_privilege`; `rls-smoke.sql` gained a
+    cross-tenant `consume_quota` regression. Both run in CI.
+  - **`.gitignore`** — narrow `/supabase/.branches/` + `/supabase/.temp/`
+    (verified all 44 tracked `supabase/` files stay tracked).
+  - **[docs/beta/READINESS.md](../beta/READINESS.md)** — the authoritative
+    beta checklist (PASS / BLOCKED / MANUAL ACTION / DEFERRED).
+- **Decisions:** CSP stays **Report-Only** (repo's own gate — two clean
+  deploys — unmet; no prod deploy yet). **English-only UI** for beta;
+  Hindi/Hinglish **AI writing** ships and no copy promises a Hindi UI.
+  Required-check + backup posture are **console-side manual actions**
+  (`gh` unauthenticated here — not claimed as done).
+- **Audited, no defect:** 22 SECDEF functions; `search_path` pinned
+  everywhere; **no client-supplied `account_id`** in any API route;
+  service-role routes authorize then scope by server-derived `accountId`;
+  webhook/cron auth fail closed; no server secret in `NEXT_PUBLIC_*` or any
+  client component; webhook payloads scrubbed before persistence.
+- **Verification:** full `db reset` from nothing ×2 (42 migrations),
+  `verify-schema.sql` ✅, `rls-smoke.sql` ✅ (also re-runnable without a
+  reset), typecheck ✅, lint ✅ (37 warnings), test ✅ 955/94, build ✅.
 
 - **Exit (whole milestone):** Beta-ready; all checks green.

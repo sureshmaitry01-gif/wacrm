@@ -18,6 +18,7 @@ DECLARE
   uida uuid; uidb uuid; accta uuid; acctb uuid;
   suba int; subb int;
   leak_sub int; leak_usage int; leak_dodo int; own_sub int;
+  quota_allowed boolean; a_count int; own_allowed boolean;
 BEGIN
   -- Seed two accounts through the real path: inserting into auth.users
   -- fires handle_new_user (profile + account + owner membership, 017) and
@@ -60,7 +61,31 @@ BEGIN
   SELECT count(*) INTO leak_dodo  FROM dodo_webhook_events;  -- service-role-only: 0 for any member
   SELECT count(*) INTO own_sub    FROM subscriptions;         -- B sees only its own
 
+  -- Regression (migration 042): consume_quota is SECURITY DEFINER, so it
+  -- bypasses RLS on usage_counters. Tenant B calling it against Tenant A's
+  -- account must be REFUSED (allowed=false) and must not mutate A's counter.
+  SELECT allowed INTO quota_allowed
+  FROM consume_quota(accta, 'monthly_messages_limit', 5, 1000000);
+
+  -- ...and B metering its OWN account must still work.
+  SELECT allowed INTO own_allowed
+  FROM consume_quota(acctb, 'monthly_messages_limit', 1, 1000000);
+
   RESET ROLE;
+
+  IF quota_allowed IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'CROSS-TENANT QUOTA ABUSE: Tenant B consumed quota against Tenant A (allowed=%)', quota_allowed;
+  END IF;
+  -- A's counter must be untouched (seeded at 42 above).
+  SELECT count INTO a_count FROM usage_counters
+  WHERE account_id = accta AND metric = 'monthly_messages_limit'
+    AND period_start = date_trunc('month', now())::date;
+  IF a_count <> 42 THEN
+    RAISE EXCEPTION 'CROSS-TENANT QUOTA TAMPERING: Tenant A counter changed 42 -> %', a_count;
+  END IF;
+  IF own_allowed IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'consume_quota too strict: Tenant B cannot meter its own account (allowed=%)', own_allowed;
+  END IF;
 
   IF leak_sub <> 0 OR leak_usage <> 0 OR leak_dodo <> 0 THEN
     RAISE EXCEPTION 'CROSS-TENANT LEAK: Tenant B read Tenant A rows (subscriptions=%, usage_counters=%, dodo_webhook_events=%)',

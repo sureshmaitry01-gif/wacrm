@@ -39,6 +39,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase CLI local scratch (created by `supabase db start/reset`).
+# Deliberately narrow: migrations/, config.toml, ci/ and seeds stay tracked.
+/supabase/.branches/
+/supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

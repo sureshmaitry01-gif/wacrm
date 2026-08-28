@@ -33,7 +33,7 @@ of every milestone.
 | **M04** | Campaign economics: cost calculator, quality score, AI campaign writer | ✅ **Complete** |
 | **M05** | Premium CRM UI redesign | ✅ **Complete** |
 | **M06** | India-first onboarding | ✅ **Complete** |
-| **M07** | Beta readiness (A/B/C/D) | 🔄 **In progress** — B ✅, C ✅, A blocked, D pending |
+| **M07** | Beta readiness (A/B/C/D) | 🔄 **In progress** — B ✅, C ✅, D ✅, **A blocked** (external evidence) |
 
 Full detail: [docs/conversion/MILESTONES.md](docs/conversion/MILESTONES.md).
 
@@ -346,9 +346,25 @@ Launch hardening, split into four sub-milestones (full detail in
   ([docs/deployment/BROADCAST_DURABILITY.md](docs/deployment/BROADCAST_DURABILITY.md)).
   Both integrations no-op when env unset; no billing/Dodo/DeepSeek/WhatsApp/
   RLS/migration changes. Checks green (typecheck, lint, test 955/94, build).
-- **M07D — security review + beta launch checklist** ⏳ Not started (owns
-  the REVOKE-PUBLIC hardening, required-check, CSP-enforce, localization
-  decision, QA sign-off).
+- **M07D — security review + beta launch checklist** ✅ **Complete**:
+  migration **`042`** fixes a **MEDIUM** cross-tenant finding —
+  `consume_quota` (SECURITY DEFINER, granted to `authenticated`) trusted a
+  caller-supplied `p_account_id`/`p_limit`, letting a signed-in user meter
+  or tamper **another tenant's** usage counters via PostgREST. Proven
+  exploitable on a live DB, fixed with an `is_account_member` check, and
+  re-proven blocked; default PUBLIC/anon EXECUTE also revoked on
+  `consume_quota`, `claim_ai_reply_slot`, `is_account_member`,
+  `seed_account_billing`. Grant assertions added to `verify-schema.sql`, a
+  cross-tenant regression to `rls-smoke.sql`, and narrow `.gitignore`
+  entries for the Supabase CLI scratch dirs.
+  Decisions: CSP stays **Report-Only** (gate unmet — no prod deploy yet);
+  **English-only UI** for beta (Hindi/Hinglish **AI writing** ships).
+  Required-check + backups are **console-side manual actions**, not claimed
+  done. Audit found **no** IDOR, service-role scoping, webhook/cron-auth, or
+  secret-exposure defects. Full DB replay ×2 + both CI SQL checks ✅;
+  typecheck ✅, lint ✅ (37 warnings), test ✅ 955/94, build ✅.
+  → **[docs/beta/READINESS.md](docs/beta/READINESS.md)**: **READY FOR
+  PRIVATE BETA WITH MANUAL BLOCKERS** (public beta gated on M07A).
 
 ---
 
