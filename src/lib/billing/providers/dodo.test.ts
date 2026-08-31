@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DodoProvider, statusForDodoEvent } from './dodo'
 
@@ -202,5 +202,129 @@ describe('DodoProvider.isConfigured', () => {
   it('is true once the API key is set', () => {
     process.env.DODO_API_KEY = 'dodo_test_key'
     expect(new DodoProvider().isConfigured()).toBe(true)
+  })
+})
+
+// ============================================================
+// Outbound checkout contract (M07A).
+//
+// Dodo's POST /subscriptions requires BOTH `customer` (with an email) and
+// `billing` (with a country) — verified against the official API reference
+// on 2026-08-28. These tests pin the exact JSON we send so a regression
+// can't silently reintroduce a 400-on-first-real-checkout.
+//
+// No network: `fetch` is stubbed. No credentials are used.
+// ============================================================
+describe('DodoProvider.createCheckoutSession — outbound contract', () => {
+  const ARGS = {
+    accountId: 'acct-123',
+    planId: 'starter' as const,
+    productId: 'prod_abc',
+    successUrl: 'https://app.example.com/settings?tab=billing&checkout=success',
+    cancelUrl: 'https://app.example.com/settings?tab=billing&checkout=cancelled',
+    email: 'owner@example.com',
+    name: 'Asha Sharma',
+  }
+
+  beforeEach(() => {
+    process.env.DODO_API_KEY = 'dodo_test_key'
+    delete process.env.DODO_BILLING_COUNTRY
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    delete process.env.DODO_API_KEY
+    delete process.env.DODO_BILLING_COUNTRY
+  })
+
+  /** Stub fetch, run a checkout, and return the parsed outbound body. */
+  async function capture(overrides: Record<string, unknown> = {}) {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ payment_link: 'https://checkout.dodo/x', subscription_id: 'sub_1' }),
+        { status: 200 },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const session = await new DodoProvider().createCheckoutSession({
+      ...ARGS,
+      ...overrides,
+    })
+    const [url, init] = fetchMock.mock.calls[0]
+    return {
+      url: String(url),
+      body: JSON.parse((init as RequestInit).body as string),
+      headers: (init as RequestInit).headers as Record<string, string>,
+      session,
+    }
+  }
+
+  it('sends the required `customer` object with the caller email', async () => {
+    const { body } = await capture()
+    expect(body.customer).toEqual({
+      email: 'owner@example.com',
+      name: 'Asha Sharma',
+    })
+  })
+
+  it('omits `name` when the profile has none, but still sends `customer`', async () => {
+    const { body } = await capture({ name: null })
+    expect(body.customer).toEqual({ email: 'owner@example.com' })
+  })
+
+  it('ALWAYS sends the required `billing` object with a country', async () => {
+    const { body } = await capture()
+    expect(body.billing).toEqual({ country: 'IN' })
+  })
+
+  it('uses DODO_BILLING_COUNTRY when the deployment sets one', async () => {
+    process.env.DODO_BILLING_COUNTRY = 'ae'
+    const { body } = await capture()
+    expect(body.billing).toEqual({ country: 'AE' })
+  })
+
+  it('ignores a malformed DODO_BILLING_COUNTRY rather than sending junk', async () => {
+    process.env.DODO_BILLING_COUNTRY = 'India'
+    const { body } = await capture()
+    expect(body.billing).toEqual({ country: 'IN' })
+  })
+
+  it('carries account_id + plan_id in metadata (tenant attribution)', async () => {
+    const { body } = await capture()
+    expect(body.metadata).toEqual({ account_id: 'acct-123', plan_id: 'starter' })
+  })
+
+  it('sends product_id, quantity, payment_link and return_url', async () => {
+    const { url, body, headers: h } = await capture()
+    expect(url).toBe('https://test.dodopayments.com/subscriptions')
+    expect(body.product_id).toBe('prod_abc')
+    expect(body.quantity).toBe(1)
+    expect(body.payment_link).toBe(true)
+    expect(body.return_url).toBe(ARGS.successUrl)
+    expect(h.Authorization).toBe('Bearer dodo_test_key')
+  })
+
+  it('maps the hosted URL + subscription id onto our neutral shape', async () => {
+    const { session } = await capture()
+    expect(session).toEqual({ url: 'https://checkout.dodo/x', id: 'sub_1' })
+  })
+
+  it('REFUSES to create a checkout with an incomplete contract (no email)', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(
+      new DodoProvider().createCheckoutSession({ ...ARGS, email: null }),
+    ).rejects.toMatchObject({ code: 'missing_billing_email' })
+    // The point: we never even reach the provider with a bad contract.
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('errors clearly when the provider returns no checkout URL', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 })),
+    )
+    await expect(
+      new DodoProvider().createCheckoutSession(ARGS),
+    ).rejects.toMatchObject({ code: 'invalid_response' })
   })
 })

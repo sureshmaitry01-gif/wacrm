@@ -18,7 +18,7 @@ import { BillingError } from '@/lib/billing/types'
  */
 export async function POST(request: Request) {
   try {
-    const { accountId, userId } = await requireRole('admin')
+    const { supabase, accountId, userId } = await requireRole('admin')
 
     const limit = await checkRateLimit(
       `billing-checkout:${userId}`,
@@ -60,12 +60,36 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ||
       new URL(request.url).origin
 
+    // Billing contact, resolved SERVER-side from the caller's own profile
+    // (RLS-scoped) — never from client input. Dodo requires a `customer`
+    // with an email on checkout; failing here with a clear message beats a
+    // provider 400.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    const email = (profile?.email as string | undefined)?.trim()
+    if (!email) {
+      return NextResponse.json(
+        {
+          error:
+            'Your profile has no email address, which the payment provider requires. Add one in Settings → Your profile and try again.',
+          code: 'missing_billing_email',
+        },
+        { status: 400 },
+      )
+    }
+
     const session = await provider.createCheckoutSession({
       accountId,
       planId,
       productId,
       successUrl: `${origin}/settings?tab=billing&checkout=success`,
       cancelUrl: `${origin}/settings?tab=billing&checkout=cancelled`,
+      email,
+      name: (profile?.full_name as string | undefined)?.trim() || null,
     })
 
     return NextResponse.json({ url: session.url, id: session.id ?? null })

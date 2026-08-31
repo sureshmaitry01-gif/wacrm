@@ -114,11 +114,20 @@ across all routes, then flip the key to `Content-Security-Policy`.
 
 **None of these may be marked PASS without real evidence.**
 
+Audited against official provider documentation on **2026-08-28** (M07A).
+No provider credentials exist in this environment, so **nothing below is
+runtime-verified**.
+
 | Contract | Status |
 |---|---|
-| **DeepSeek** — model id (`deepseek-v4-flash`), base URL, `max_tokens` shape | **BLOCKED** — unverified against live docs/key |
-| **Dodo** — webhook header/scheme + field names, INR subscription support, event names | **BLOCKED** — adapter is defensive but unverified against a real delivery |
-| **Meta India rate card** — marketing 0.8631 / utility 0.115 / auth 0.115 INR | **BLOCKED** — `verified: false` in `meta-rate-card.ts`; every estimate carries a warning |
+| **DeepSeek** — base URL, Bearer auth, `/chat/completions`, model `deepseek-v4-flash`, `max_tokens`, response/usage shape, 401/429 mapping | **VERIFIED (docs)** — every assumption confirmed, zero mismatches. **Runtime BLOCKED** (no `DEEPSEEK_API_KEY`). |
+| **Dodo** — Standard-Webhooks signature scheme + exact headers, `id.timestamp.body` base64 HMAC, `webhook-id` idempotency, event names (incl. `subscription.cancelled`), INR + Indian e-mandates, base URLs, Bearer auth | **VERIFIED (docs)** |
+| **Dodo** — checkout request contract | **FIXED in M07A** — `billing` (required, was missing) and `customer` (required, was conditional and in practice always omitted) would have 400'd the first real checkout. Corrected + pinned by contract tests. |
+| **Dodo** — signed webhook + test-mode checkout runtime | **BLOCKED** — no `DODO_API_KEY` / `DODO_WEBHOOK_SECRET`; no real delivery exercised. |
+| **Dodo** — Checkout Sessions migration (`POST /subscriptions` is deprecated) | **DEFERRED** — metadata→subscription-webhook propagation is **undocumented**, and tenant attribution depends on it. Not migrated without proof. See `docs/billing/DODO.md` §6. |
+| **Meta** — per-message model (since 2025-07-01), delivery-based billing, free service messages, rate cards effective 2026-07-01 | **VERIFIED (docs)** — matches the calculator's model and `effective_from`. |
+| **Meta India rate card** — marketing 0.8631 / utility 0.115 / auth 0.115 INR | **BLOCKED** — exact INR values are published only via a gated selector/CSV and could not be retrieved. `verified: false` stays; every estimate carries a warning. India rates also changed 2026-01-01 (marketing) and 2026-04-01 (auth-international), so re-checking is mandatory. |
+| **Meta** — estimator caveats | **DOCUMENTED** — utility messages are free inside an open 24h service window, and utility/auth volume tiers are not modeled. Both make estimates **conservative** (over-, never under-quote). |
 
 ## 8. Remaining blockers before **public** beta
 

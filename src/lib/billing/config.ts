@@ -28,6 +28,33 @@ export function dodoApiKey(): string | null {
   return process.env.DODO_API_KEY || null
 }
 
+/**
+ * Billing country (ISO 3166-1 alpha-2) sent as `billing.country` on
+ * checkout. Dodo's `POST /subscriptions` requires a billing address with a
+ * country (verified against the official API reference, 2026-08-28).
+ *
+ * ⚠️ EXPLICIT BETA LIMITATION — this is NOT a real customer-country
+ * solution. The data model stores no billing country anywhere: `accounts`
+ * has no country column, and `accounts.default_currency` is a
+ * deals-display setting that defaults to 'USD', so inferring a country
+ * from it would be wrong. Guessing from a phone number would also be
+ * wrong.
+ *
+ * So the country is an explicit, operator-set deployment value —
+ * `DODO_BILLING_COUNTRY`, defaulting to `IN` for the India-first beta.
+ * A deployment selling outside its configured country MUST either set
+ * this var or (properly) collect a per-account billing country first.
+ *
+ * Long-term fix (tracked, not in M07A): collect the billing country from
+ * the customer — either by storing it on the account, or by moving to
+ * Dodo's Checkout Sessions API, which collects the billing address during
+ * checkout. See docs/billing/DODO.md.
+ */
+export function dodoBillingCountry(): string {
+  const raw = process.env.DODO_BILLING_COUNTRY?.trim().toUpperCase()
+  return raw && /^[A-Z]{2}$/.test(raw) ? raw : 'IN'
+}
+
 export function dodoWebhookSecret(): string | null {
   return process.env.DODO_WEBHOOK_SECRET || null
 }

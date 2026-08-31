@@ -4,8 +4,11 @@ Implemented in milestone **M02**. This documents the billing architecture,
 the Dodo integration, and the **external assumptions that must be verified
 before going live**.
 
-> Status: **foundation, not production-verified.** The code is written and
-> tested, but no live Dodo account has been connected. See §6.
+> Status: **documentation-verified, NOT runtime-verified.** The contract
+> was audited against Dodo's official docs on **2026-08-28** (M07A) and two
+> real defects were found and fixed — but no live/test Dodo account has
+> been connected, so no real checkout or signed webhook has been exercised.
+> See §6.
 
 ## 1. Architecture
 
@@ -134,9 +137,103 @@ keeps a payments path free of a transitive dependency tree and off someone
 else's release cadence — the same choice the repo already makes for Meta
 webhooks.
 
-## 6. ⚠️ External risks — verify before production
+## 6. Contract verification (M07A — 2026-08-28)
 
-These are **assumptions in code**, defensively written but unconfirmed
+Audited against the **official Dodo documentation** on **2026-08-28**
+([webhooks](https://docs.dodopayments.com/developer-resources/webhooks),
+[subscription events](https://docs.dodopayments.com/developer-resources/webhooks/intents/subscription),
+[POST /subscriptions](https://docs.dodopayments.com/api-reference/subscriptions/post-subscriptions),
+[Checkout Sessions](https://docs.dodopayments.com/api-reference/checkout-sessions/create)).
+No credentials were available, so **nothing below is runtime-verified**.
+
+### ✅ Documentation-VERIFIED (no code change needed)
+
+- **Base URLs** — `https://test.dodopayments.com` / `https://live.dodopayments.com`.
+- **Auth** — `Authorization: Bearer <API key>`.
+- **Webhook signature** — Dodo follows the **Standard Webhooks** spec:
+  headers `webhook-id` / `webhook-timestamp` / `webhook-signature`, signed
+  message `id.timestamp.body`, **base64** HMAC-SHA256. Matches the adapter
+  exactly (including the `svix-*` aliases).
+- **Idempotency** — `webhook-id` is the documented dedupe key; we use it as
+  the `dodo_webhook_events` primary key. Retries: up to **8** attempts with
+  exponential backoff.
+- **Event names** — `subscription.active` / `.renewed` / `.on_hold` /
+  `.cancelled` (British spelling confirmed) / `.expired` / `.failed` /
+  `.plan_changed` / `.updated`. Our map handles these, plus the
+  `canceled` spelling defensively.
+- **INR + Indian recurring** — supported, including an INR e-mandate floor
+  (`mandate_min_amount_inr_paise`, default ₹15,000 when unset).
+- **`payment_link: true` → `payment_link`** in the response.
+
+### ❌ Two defects FOUND and FIXED in M07A
+
+1. **`billing` was missing.** `POST /subscriptions` **requires** a billing
+   address object with a `country`. The adapter never sent one — a real
+   checkout would have failed with a 400 on the very first attempt.
+2. **`customer` was conditional.** The docs mark `customer` **required**
+   (either `customer_id`, or new-customer details where **`email` is
+   required** and `name` is optional). The adapter only sent it when an
+   email happened to be passed — and the checkout route never passed one,
+   so in practice it was **always omitted**.
+
+**Repair (deliberately minimal, legacy endpoint retained):**
+
+- The checkout route now resolves the billing contact **server-side** from
+  the authenticated caller's own `profiles` row (email + full name) — never
+  from client input — and returns a clear 400 if the profile has no email.
+- The adapter now **always** sends `customer: { email, name? }` and
+  `billing: { country }`, and **refuses before the network call**
+  (`missing_billing_email`) if the contract would be incomplete.
+- Pinned by outbound-contract tests in `dodo.test.ts` (no network, no
+  credentials).
+
+### ⚠️ Billing country is an explicit BETA LIMITATION
+
+`billing.country` comes from **`DODO_BILLING_COUNTRY`** (default `IN`),
+because **the data model stores no billing country**: `accounts` has no
+country column, and `accounts.default_currency` is a deals-display setting
+defaulting to `USD` — inferring a country from it (or from a phone number)
+would be wrong. This is documented as an **India-first beta constraint,
+not the long-term solution**.
+
+**Long-term fix:** either collect a per-account billing country, or move to
+**Checkout Sessions** (below), which collects the billing address during
+checkout.
+
+### 🔭 Why we did NOT migrate to Checkout Sessions yet
+
+`POST /subscriptions` is **deprecated**; Dodo recommends
+**`POST /checkouts`** (Checkout Sessions), which needs only `product_cart`
+and makes `customer`/`billing_address` optional — collecting them during
+checkout, which would remove the country problem entirely.
+
+**Blocker:** our tenant attribution depends on `metadata.account_id` being
+echoed back on `subscription.*` lifecycle webhooks. The documentation does
+**not state** that metadata attached to a *checkout session* propagates to
+the resulting *subscription* or its webhooks. Migrating on that unverified
+assumption risks **payments that cannot be attributed to an account**
+(customer charged, plan never provisioned). With no test credentials to
+prove propagation, the safe choice is to keep the working legacy endpoint
+and revisit once a test account exists.
+
+### 🚫 Still BLOCKED — requires test credentials
+
+- **Signed-webhook runtime verification** — no real signed delivery has
+  been received or validated end-to-end.
+- **Checkout runtime verification** — no test-mode checkout has been
+  created; the corrected request shape is documentation-verified only.
+- **Checkout Sessions metadata propagation** — must be proven before any
+  migration.
+- **Merchant capability** (UPI/RuPay availability) and **GST/invoicing**
+  obligations depend on account approval.
+
+**Go-live sequence:** connect a Dodo **test** account → create one checkout
+→ capture a real signed webhook → diff it against `mapWebhookEvent` →
+replay it to prove idempotency → then switch to live.
+
+## 6b. ⚠️ Residual external risks
+
+These remain **assumptions in code**, defensively written but unconfirmed
 against a live Dodo account:
 
 1. **Webhook signature scheme.** The adapter implements Standard Webhooks
@@ -157,8 +254,8 @@ against a live Dodo account:
    before charge), and per-mandate caps. Renewals may settle on a delay
    that differs from card behavior; treat `subscription.renewed` timing as
    provider-driven, not instantaneous.
-5. **Checkout request shape** (`POST /subscriptions` with
-   `payment_link: true`) should be validated in test mode first.
+5. **Checkout request shape** — now documentation-verified and corrected
+   (see §6), but still **must be validated in test mode** before go-live.
 6. **Currency/tax.** INR pricing and any GST handling (Dodo acts as
    merchant of record in many setups) must be confirmed — this affects
    invoicing obligations.

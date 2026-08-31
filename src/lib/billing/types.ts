@@ -36,8 +36,16 @@ export interface CreateCheckoutArgs {
   /** Where the customer returns after success/cancel. */
   successUrl: string
   cancelUrl: string
-  /** Optional customer email to prefill / attach. */
+  /**
+   * Billing contact email. REQUIRED by Dodo's checkout contract (a
+   * `customer` object with an email is mandatory), so the route resolves
+   * it server-side from the authenticated caller's profile — never from
+   * client input. Kept optional in the type only so a provider that
+   * doesn't need it can ignore it; the Dodo adapter rejects a missing one.
+   */
   email?: string | null
+  /** Billing contact name, when the profile has one. Optional per Dodo. */
+  name?: string | null
 }
 
 /** Normalized shape of a subscription read back from the provider. */

@@ -3,6 +3,7 @@ import crypto from 'node:crypto'
 import {
   dodoApiBaseUrl,
   dodoApiKey,
+  dodoBillingCountry,
   dodoWebhookSecret,
   isDodoConfigured,
   planIdForDodoProduct,
@@ -249,6 +250,15 @@ export class DodoProvider implements BillingProvider {
         { code: 'missing_product', status: 400 },
       )
     }
+    // Fail before the network call rather than letting Dodo 400: a
+    // `customer` (with an email) is REQUIRED by the checkout contract, and
+    // the caller resolves it server-side from the authenticated profile.
+    if (!args.email || !args.email.trim()) {
+      throw new BillingError(
+        'A billing email is required to start checkout.',
+        { code: 'missing_billing_email', status: 400 },
+      )
+    }
 
     let res: Response
     try {
@@ -266,7 +276,18 @@ export class DodoProvider implements BillingProvider {
           // Echoed back on webhooks — this is how we attribute an event to
           // a tenant without trusting anything client-supplied.
           metadata: { account_id: args.accountId, plan_id: args.planId },
-          ...(args.email ? { customer: { email: args.email } } : {}),
+          // `customer` and `billing` are BOTH required by Dodo's
+          // POST /subscriptions contract (verified 2026-08-28). Sending
+          // the request without them returns 400. `email` is guaranteed
+          // non-empty by the guard above; `name` is optional per the docs.
+          customer: {
+            email: args.email,
+            ...(args.name ? { name: args.name } : {}),
+          },
+          // Country only — city/state/street/zipcode are optional and we
+          // deliberately do not invent them. See dodoBillingCountry() for
+          // why this is a deployment-level beta limitation.
+          billing: { country: dodoBillingCountry() },
         }),
         signal: AbortSignal.timeout(API_TIMEOUT_MS),
         cache: 'no-store',
