@@ -331,8 +331,16 @@ highlight, and plain-English INR / no-markup / approval copy.
 Launch hardening, split into four sub-milestones (full detail in
 [docs/conversion/MILESTONES.md](docs/conversion/MILESTONES.md)):
 
-- **M07A — provider-contract verification** ⏳ **Blocked** on real
-  DeepSeek/Dodo/Meta evidence. Not started.
+- **M07A — provider-contract verification** ⏳ **Partially done, still
+  BLOCKED.** **DeepSeek ✅ VERIFIED** (docs 2026-08-28 + **runtime
+  2026-08-31**: live call through the real adapter returned the exact
+  sentinel, usage parsed 107/36/143, model `deepseek-v4-flash`, env
+  detected by the normal Next.js loader; no credentials recorded — see
+  `docs/beta/READINESS.md` §7a). **Dodo** docs verified and two real
+  checkout-contract defects fixed (`14b7134`), but **runtime
+  checkout/webhook BLOCKED** (no test credentials). **Meta** pricing
+  model/effective date verified, **exact India INR values BLOCKED**
+  (`verified: false` stays). Milestone remains **incomplete**.
 - **M07B — data & infra validation** ✅ **Complete** — migrations 040–041
   validated on a real local Postgres; strengthened `verify-schema.sql` +
   cross-tenant `rls-smoke.sql` proving isolation; committed `68fcf28`,
