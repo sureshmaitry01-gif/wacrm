@@ -122,7 +122,30 @@ back to BYO exactly as before. **Local dev and tests need none of these.**
 - **Playground / test-key** routes remain BYO-only (they're advanced
   BYO tools).
 - **Coarse metering** (1 request = 1 credit) — token-weighted later.
-- **DeepSeek model id / API contract unverified against live docs** — the
-  default `deepseek-v4-flash` and the `https://api.deepseek.com/chat/
-  completions` + `max_tokens` shape follow DeepSeek's OpenAI-compatible
-  convention but should be confirmed against a live key before production.
+## Contract verification (M07A)
+
+**Documentation VERIFIED — 2026-08-28.** Against the official DeepSeek API
+docs: base URL `https://api.deepseek.com`, `Authorization: Bearer`,
+`/chat/completions`, OpenAI-compatible transport, `deepseek-v4-flash` listed
+as a current model, `max_tokens` accepted (not deprecated),
+`choices[0].message.content` + `usage.{prompt,completion,total}_tokens`, and
+401/429 error semantics matching the adapter's mapping. **Zero mismatches —
+no code change was required.**
+
+**Runtime VERIFIED — 2026-08-31.** One minimal live request through the
+existing adapter (`platformDeepSeekConfig()` → `generateReply()` →
+`generateDeepSeek()`):
+
+| | |
+|---|---|
+| Model | `deepseek-v4-flash` |
+| Base URL | `https://api.deepseek.com` |
+| Response parsing | **VERIFIED** — returned the exact sentinel `DEEPSEEK_RUNTIME_OK` |
+| Usage parsing | **VERIFIED** — 107 prompt / 36 completion / 143 total tokens |
+| Env detection | **VERIFIED** — `DEEPSEEK_API_KEY` resolved by the normal Next.js env loader (`@next/env`), no manual sourcing |
+| Credentials recorded | **None** — no key value printed, logged, or committed |
+
+The probe test was temporary and deleted after the run. The committed test
+suite does not load `.env.local` by design (`vitest.config.ts` pins dummy
+secrets so tests match CI), so DeepSeek runtime status is evidenced in
+`docs/beta/READINESS.md` §7a rather than by a credential-dependent test.

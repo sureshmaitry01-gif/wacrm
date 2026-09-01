@@ -106,21 +106,22 @@ across all routes, then flip the key to `Content-Security-Policy`.
 | Upstash Redis (distributed rate limiting) | **MANUAL ACTION REQUIRED** — in-memory fallback is ineffective across serverless instances |
 | Sentry DSN / PostHog key | **MANUAL ACTION REQUIRED** (no-op until set) |
 | Dodo product ids + webhook endpoint (test → live) | **BLOCKED on M07A** |
-| DeepSeek API key + model id | **BLOCKED on M07A** |
+| DeepSeek API key + model id | **Contract/runtime: PASS** (verified 2026-08-31 — see §7a: key detected by the normal env loader, model `deepseek-v4-flash` confirmed live). **Production config: MANUAL ACTION REQUIRED** — `DEEPSEEK_API_KEY` must still be set in the Vercel production environment; the dev-machine verification above does not satisfy that. |
 | Meta WhatsApp production number + webhook URL | **MANUAL ACTION REQUIRED** |
 | Alerting (Sentry rules / uptime) | **DEFERRED / NON-BLOCKING** |
 
-## 7. External-contract blockers (M07A — NOT verified)
+## 7. External-contract blockers (M07A — PARTIALLY verified)
 
 **None of these may be marked PASS without real evidence.**
 
 Audited against official provider documentation on **2026-08-28** (M07A).
-No provider credentials exist in this environment, so **nothing below is
-runtime-verified**.
+**DeepSeek** has since been runtime-verified (**2026-08-31**, §7a). **Dodo
+and Meta remain without credentials/evidence**, so nothing in those rows is
+runtime-verified.
 
 | Contract | Status |
 |---|---|
-| **DeepSeek** — base URL, Bearer auth, `/chat/completions`, model `deepseek-v4-flash`, `max_tokens`, response/usage shape, 401/429 mapping | **VERIFIED (docs)** — every assumption confirmed, zero mismatches. **Runtime BLOCKED** (no `DEEPSEEK_API_KEY`). |
+| **DeepSeek** — base URL, Bearer auth, `/chat/completions`, model `deepseek-v4-flash`, `max_tokens`, response/usage shape, 401/429 mapping | **VERIFIED (docs + runtime)** — see §7a. Documentation: every assumption confirmed, zero mismatches. Runtime: one live call through the real adapter on **2026-08-31** returned the exact sentinel with correct usage parsing. |
 | **Dodo** — Standard-Webhooks signature scheme + exact headers, `id.timestamp.body` base64 HMAC, `webhook-id` idempotency, event names (incl. `subscription.cancelled`), INR + Indian e-mandates, base URLs, Bearer auth | **VERIFIED (docs)** |
 | **Dodo** — checkout request contract | **FIXED in M07A** — `billing` (required, was missing) and `customer` (required, was conditional and in practice always omitted) would have 400'd the first real checkout. Corrected + pinned by contract tests. |
 | **Dodo** — signed webhook + test-mode checkout runtime | **BLOCKED** — no `DODO_API_KEY` / `DODO_WEBHOOK_SECRET`; no real delivery exercised. |
@@ -128,6 +129,29 @@ runtime-verified**.
 | **Meta** — per-message model (since 2025-07-01), delivery-based billing, free service messages, rate cards effective 2026-07-01 | **VERIFIED (docs)** — matches the calculator's model and `effective_from`. |
 | **Meta India rate card** — marketing 0.8631 / utility 0.115 / auth 0.115 INR | **BLOCKED** — exact INR values are published only via a gated selector/CSV and could not be retrieved. `verified: false` stays; every estimate carries a warning. India rates also changed 2026-01-01 (marketing) and 2026-04-01 (auth-international), so re-checking is mandatory. |
 | **Meta** — estimator caveats | **DOCUMENTED** — utility messages are free inside an open 24h service window, and utility/auth volume tiers are not modeled. Both make estimates **conservative** (over-, never under-quote). |
+
+### 7a. DeepSeek — runtime verification evidence
+
+| Item | Result |
+|---|---|
+| Documentation verification | **VERIFIED** (2026-08-28) |
+| Runtime verification | **VERIFIED** |
+| Runtime verification date | **2026-08-31** |
+| Model | `deepseek-v4-flash` |
+| Base URL | `https://api.deepseek.com` |
+| Adapter response parsing | **VERIFIED** — `choices[0].message.content` returned the exact sentinel `DEEPSEEK_RUNTIME_OK` |
+| Usage parsing | **VERIFIED** — `prompt_tokens` / `completion_tokens` / `total_tokens` mapped to 107 / 36 / 143 |
+| Env detection | **VERIFIED** — `DEEPSEEK_API_KEY` is picked up by the normal Next.js env loader (`@next/env`, as used by `next dev`/`next build`); no manual sourcing needed |
+| Credentials recorded | **None.** No key value was printed, logged, committed, or stored anywhere in this repo. |
+
+Method: one minimal live request through the **existing** adapter
+(`platformDeepSeekConfig()` → `generateReply()` → `generateDeepSeek()`) using
+a throwaway probe test that was deleted immediately after the run.
+
+> Note: the automated test suite deliberately does **not** load `.env.local`
+> (`vitest.config.ts` pins dummy secrets so tests match CI and never depend
+> on developer credentials). DeepSeek runtime status is therefore evidenced
+> here, not by a committed test that would require a real key.
 
 ## 8. Remaining blockers before **public** beta
 

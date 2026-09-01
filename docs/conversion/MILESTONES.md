@@ -73,8 +73,24 @@ validation precede monitoring and the security/launch sign-off.
   Dodo webhook signature scheme + header/field names + INR subscriptions
   (M02), and the Meta India rate card (M04). Update adapters/config **only**
   where a discrepancy is confirmed, behind the existing abstractions.
-- **Status:** **Blocked** pending real DeepSeek / Dodo / Meta evidence — not
-  started, not to be marked complete until that evidence exists.
+- **Progress (partial — milestone stays INCOMPLETE):**
+  - **DeepSeek — ✅ VERIFIED (documentation 2026-08-28 + runtime 2026-08-31).**
+    Zero mismatches; no code change needed. One live call through the real
+    adapter returned the exact sentinel with correct usage parsing; the
+    normal Next.js env loader detects `DEEPSEEK_API_KEY`. Evidence:
+    `docs/beta/READINESS.md` §7a. No credentials recorded.
+  - **Dodo — documentation VERIFIED; two real defects FIXED** (`billing` was
+    missing and `customer` was effectively always omitted — both required,
+    would have 400'd the first real checkout; commit `14b7134`).
+    **Runtime BLOCKED** — no test credentials, so no real checkout or signed
+    webhook has been exercised. Checkout-Sessions migration deferred
+    (metadata→webhook propagation undocumented).
+  - **Meta — pricing model, delivery-based billing, free service messages
+    and the 2026-07-01 effective date VERIFIED; exact India INR values
+    BLOCKED** (published only via a gated selector/CSV). `verified: false`
+    stays.
+- **Status:** **Blocked / incomplete** — Dodo runtime and Meta numeric
+  evidence are still outstanding. Not to be marked complete until both exist.
 
 ### M07B — Data & infrastructure validation ✅ Complete
 - **Delivered:** migrations 040–041 validated against a real local Postgres
