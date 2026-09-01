@@ -249,3 +249,50 @@ html[data-theme="rose"] {
     @apply font-sans;
   }
 }
+
+/* ============================================================
+ * MARKETING SCOPE — the public landing page renders light + emerald
+ * regardless of a visitor's (or returning user's) saved app theme/mode.
+ * The authenticated app is themeable (violet/emerald/cobalt/amber/rose,
+ * light/dark); the public site is a fixed brand surface and must not
+ * flicker between an app accent and the marketing brand.
+ *
+ * This block is a DIV-scoped override, not an `html[data-*]` selector —
+ * it never touches the app's own theme tokens or the boot script. It
+ * copies the light-mode neutrals and the emerald accent from above
+ * verbatim; keep the two in sync if either changes.
+ * ============================================================ */
+.landing-scope {
+  --background: oklch(0.975 0.003 260);
+  --foreground: oklch(0.21 0.01 260);
+  --card: oklch(1 0 0);
+  --card-2: oklch(0.985 0.002 260);
+  --card-foreground: oklch(0.21 0.01 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.01 260);
+  --secondary: oklch(0.967 0.003 260);
+  --secondary-foreground: oklch(0.25 0.01 260);
+  --muted: oklch(0.967 0.003 260);
+  --muted-foreground: oklch(0.52 0.015 260);
+  --accent: oklch(0.96 0.004 260);
+  --accent-foreground: oklch(0.25 0.01 260);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0.004 260);
+  --input: oklch(0.922 0.004 260);
+  --radius: 0.625rem;
+
+  --primary: oklch(0.62 0.16 162);
+  --primary-foreground: oklch(0.16 0.02 162);
+  --primary-hover: oklch(0.68 0.15 162);
+  --primary-soft: oklch(0.62 0.16 162 / 0.12);
+  --primary-soft-2: oklch(0.62 0.16 162 / 0.22);
+  --ring: oklch(0.62 0.16 162);
+
+  /* AI accent — restrained indigo, reserved for the AI writer section. */
+  --ai: oklch(0.52 0.19 268);
+  --ai-foreground: oklch(0.985 0 0);
+  --ai-soft: oklch(0.52 0.19 268 / 0.1);
+
+  background: var(--background);
+  color: var(--foreground);
+}
