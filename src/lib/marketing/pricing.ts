@@ -9,7 +9,12 @@
 // worth advertising — see PLAN_CATALOG.enterprise).
 // ============================================================
 
-import { PLAN_CATALOG, UNLIMITED, type PlanId } from '@/lib/billing/plans'
+import {
+  PLAN_CATALOG,
+  UNLIMITED,
+  type NumericLimitKey,
+  type PlanId,
+} from '@/lib/billing/plans'
 
 export interface PublicPricingPlan {
   id: PlanId
@@ -47,6 +52,50 @@ export function getPublicPricingPlans(): PublicPricingPlan[] {
       ],
     }
   })
+}
+
+// ---------------------------------------------------------------------
+// Comparison matrix
+//
+// The public pricing grid is a matrix rather than four feature-list
+// cards, so every row below is read straight out of `PLAN_CATALOG` for
+// all four public plans at once. Same rule as above: no second copy of
+// any number lives in the marketing layer.
+// ---------------------------------------------------------------------
+
+export interface PricingMatrixRow {
+  label: string
+  /** Display value per public plan, in `PUBLIC_PLAN_ORDER`. */
+  values: string[]
+}
+
+function fmtFlag(enabled: boolean): string {
+  return enabled ? 'Included' : '—'
+}
+
+export function getPricingMatrix(): PricingMatrixRow[] {
+  const plans = PUBLIC_PLAN_ORDER.map((id) => PLAN_CATALOG[id])
+  const numeric = (key: NumericLimitKey, label: string): PricingMatrixRow => ({
+    label,
+    values: plans.map((p) => fmtCount(p.limits[key])),
+  })
+
+  return [
+    numeric('contacts_limit', 'Contacts'),
+    numeric('monthly_messages_limit', 'Messages / month'),
+    numeric('monthly_broadcasts_limit', 'Campaigns / month'),
+    numeric('automations_limit', 'Automations'),
+    numeric('ai_monthly_credits_limit', 'AI credits / month'),
+    numeric('team_members_limit', 'Team members'),
+    {
+      label: 'API access',
+      values: plans.map((p) => fmtFlag(p.limits.api_access_enabled)),
+    },
+    {
+      label: 'Agency workspaces',
+      values: plans.map((p) => fmtFlag(p.limits.agency_workspaces_enabled)),
+    },
+  ]
 }
 
 /** ₹499 style formatting for a monthly platform fee. Free is called out

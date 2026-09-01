@@ -58,6 +58,19 @@
    * Exposes shadow-card / shadow-card-hover. */
   --shadow-card: 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 1px 3px 0 oklch(0 0 0 / 0.03);
   --shadow-card-hover: 0 6px 16px -4px oklch(0 0 0 / 0.1), 0 2px 6px -2px oklch(0 0 0 / 0.06);
+  /* Marketing-only palette. These raw vars are defined ONLY inside
+   * `.landing-scope` (see the marketing block at the bottom of this
+   * file); the mappings here just expose them as Tailwind utilities
+   * (bg-mint, fill-mint-strong, text-signal, bg-ink, text-ink-muted…)
+   * so the public site can be written in normal utility classes. They
+   * resolve to nothing in the authenticated app, which never uses them. */
+  --color-mint: var(--mint);
+  --color-mint-strong: var(--mint-strong);
+  --color-signal: var(--signal);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-line: var(--ink-line);
+  --color-ink-muted: var(--ink-muted);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -263,36 +276,293 @@ html[data-theme="rose"] {
  * verbatim; keep the two in sync if either changes.
  * ============================================================ */
 .landing-scope {
-  --background: oklch(0.975 0.003 260);
-  --foreground: oklch(0.21 0.01 260);
+  /* ---- Neutrals ----
+   * Warm paper white, and a charcoal carrying a faint green cast so the
+   * greys harmonise with the brand green instead of sitting cold against
+   * it. Roughly 80% of the page is these four values. */
+  --background: oklch(0.993 0.002 120);
+  --foreground: oklch(0.205 0.012 160);
   --card: oklch(1 0 0);
-  --card-2: oklch(0.985 0.002 260);
-  --card-foreground: oklch(0.21 0.01 260);
+  --card-2: oklch(0.977 0.005 155);
+  --card-foreground: oklch(0.205 0.012 160);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.01 260);
-  --secondary: oklch(0.967 0.003 260);
-  --secondary-foreground: oklch(0.25 0.01 260);
-  --muted: oklch(0.967 0.003 260);
-  --muted-foreground: oklch(0.52 0.015 260);
-  --accent: oklch(0.96 0.004 260);
-  --accent-foreground: oklch(0.25 0.01 260);
+  --popover-foreground: oklch(0.205 0.012 160);
+  --secondary: oklch(0.968 0.005 155);
+  --secondary-foreground: oklch(0.3 0.012 160);
+  --muted: oklch(0.968 0.005 155);
+  --muted-foreground: oklch(0.5 0.013 160);
+  --accent: oklch(0.962 0.006 155);
+  --accent-foreground: oklch(0.3 0.012 160);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0.004 260);
-  --input: oklch(0.922 0.004 260);
-  --radius: 0.625rem;
+  --border: oklch(0.905 0.007 155);
+  --input: oklch(0.905 0.007 155);
+  /* Deliberately tighter than the app's 0.625rem — the public site is
+   * built from structural lines and flush grids, not rounded cards. */
+  --radius: 0.375rem;
 
-  --primary: oklch(0.62 0.16 162);
-  --primary-foreground: oklch(0.16 0.02 162);
-  --primary-hover: oklch(0.68 0.15 162);
-  --primary-soft: oklch(0.62 0.16 162 / 0.12);
-  --primary-soft-2: oklch(0.62 0.16 162 / 0.22);
-  --ring: oklch(0.62 0.16 162);
+  /* ---- Brand ----
+   * A deep pine emerald rather than a bright WhatsApp green: saturated
+   * enough to read as the brand, dark enough to carry white text at
+   * AA, and quiet enough to use on a mostly-white page without
+   * shouting. The bright green survives as `--signal`, reserved for
+   * live status and data marks. */
+  --primary: oklch(0.46 0.115 159);
+  --primary-foreground: oklch(0.985 0.01 155);
+  --primary-hover: oklch(0.395 0.105 159);
+  --primary-soft: oklch(0.46 0.115 159 / 0.08);
+  --primary-soft-2: oklch(0.46 0.115 159 / 0.16);
+  --ring: oklch(0.46 0.115 159);
 
-  /* AI accent — restrained indigo, reserved for the AI writer section. */
-  --ai: oklch(0.52 0.19 268);
-  --ai-foreground: oklch(0.985 0 0);
-  --ai-soft: oklch(0.52 0.19 268 / 0.1);
+  /* AI accent — restrained indigo, reserved for the AI writer only. */
+  --ai: oklch(0.47 0.13 275);
+  --ai-foreground: oklch(0.99 0 0);
+  --ai-soft: oklch(0.47 0.13 275 / 0.07);
+
+  /* ---- Marketing extras (exposed as utilities via @theme inline) ---- */
+  /* Pale green wash: section tints and symbol backgrounds. */
+  --mint: oklch(0.965 0.028 158);
+  /* The fill inside illustrated symbols — the one place green is allowed
+   * to be an area rather than an accent. */
+  --mint-strong: oklch(0.895 0.06 158);
+  /* Live/positive signal: status dots, delivered marks, data points. */
+  --signal: oklch(0.7 0.16 156);
+  /* The single dark section (security) and its surfaces. */
+  --ink: oklch(0.185 0.014 162);
+  --ink-2: oklch(0.245 0.014 162);
+  --ink-line: oklch(0.32 0.012 162);
+  --ink-muted: oklch(0.72 0.012 160);
+  --ink-fg: oklch(0.97 0.004 150);
 
   background: var(--background);
   color: var(--foreground);
+}
+
+/* Tabular figures are deliberately NOT set page-wide. In Schibsted
+ * Grotesk the `tnum` feature also widens the period and comma (so
+ * decimal separators align in a column), which visibly detaches the
+ * full stop at display sizes. The utility face is already monospaced,
+ * so the data that needs aligned columns gets it for free; this class
+ * exists for the few figures set in the display face. */
+.landing-scope .m-tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+ * MARKETING TEXTURE
+ * Background detail should be felt before it is noticed. Both of these
+ * sit far below text contrast and are never placed behind body copy.
+ * ============================================================ */
+
+/* Engineering-drawing dot field. Used behind product frames. */
+.landing-scope .m-dotfield {
+  background-image: radial-gradient(
+    oklch(0.205 0.012 160 / 0.07) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+}
+
+/* Hairline column grid — echoes the structural rules of the page shell. */
+.landing-scope .m-gridlines {
+  background-image: linear-gradient(
+    to right,
+    oklch(0.205 0.012 160 / 0.05) 1px,
+    transparent 1px
+  );
+  background-size: 96px 100%;
+}
+
+/* A single soft mint wash, masked to fade out. The page's only gradient. */
+.landing-scope .m-wash {
+  background-image: radial-gradient(
+    58% 46% at 50% 0%,
+    oklch(0.7 0.16 156 / 0.1),
+    transparent 72%
+  );
+}
+
+/* ============================================================
+ * MARKETING MOTION
+ * One shared vocabulary: things arrive by fading up a few pixels,
+ * lines draw themselves, and nothing loops in the reader's periphery.
+ * Every animation here is suppressed under prefers-reduced-motion.
+ * ============================================================ */
+
+@keyframes m-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes m-rise-scale {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes m-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes m-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes m-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    /* The track renders its children twice; -50% lands exactly on the
+     * start of the duplicate, so the loop has no visible seam. */
+    transform: translateX(-50%);
+  }
+}
+
+/* ---- Scroll reveal ----
+ * `Reveal` sets data-visible when the element enters the viewport. The
+ * hidden state lives here rather than in JS so there is no flash of
+ * un-styled content, and so reduced-motion users simply never see it. */
+/* Guarded on `scripting: enabled` so a no-JS visitor (or a browser that
+ * does not understand the query, which then ignores the whole block)
+ * gets the fully-visible page rather than a blank one. */
+@media (scripting: enabled) {
+  .landing-scope [data-reveal] {
+    opacity: 0;
+  }
+}
+.landing-scope [data-reveal][data-visible='true'] {
+  animation: m-rise 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+.landing-scope [data-reveal='frame'][data-visible='true'] {
+  animation-name: m-rise-scale;
+  animation-duration: 760ms;
+}
+
+/* ---- Symbol micro-interactions ----
+ * Each illustrated symbol animates once on hover/focus of its card, for
+ * about a second, then rests. Nothing animates unprompted. */
+.landing-scope .m-sym-draw {
+  stroke-dasharray: var(--dash, 64);
+  stroke-dashoffset: var(--dash, 64);
+}
+.landing-scope .group\/sym:hover .m-sym-draw,
+.landing-scope .group\/sym:focus-visible .m-sym-draw {
+  animation: m-draw 900ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.landing-scope .m-sym-enter {
+  opacity: 0;
+}
+.landing-scope .group\/sym:hover .m-sym-enter,
+.landing-scope .group\/sym:focus-visible .m-sym-enter {
+  animation: m-drop-in 620ms cubic-bezier(0.22, 1, 0.36, 1) 160ms forwards;
+}
+
+/* ---- Chart lines ----
+ * A trend line draws itself once, as its section arrives. */
+.landing-scope .m-draw-on-reveal {
+  stroke-dasharray: var(--dash, 600);
+  stroke-dashoffset: var(--dash, 600);
+}
+.landing-scope [data-visible='true'] .m-draw-on-reveal {
+  animation: m-draw 1500ms cubic-bezier(0.33, 1, 0.68, 1) 240ms forwards;
+}
+
+/* ---- Workflow connectors ----
+ * The rail between workflow steps extends itself once, as the section
+ * arrives, so the sequence reads as a sequence. */
+@keyframes m-extend {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes m-extend-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.landing-scope .m-connector {
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+.landing-scope .m-connector-v {
+  transform: scaleY(0);
+  transform-origin: center top;
+}
+.landing-scope [data-visible='true'] .m-connector {
+  animation: m-extend 1200ms cubic-bezier(0.22, 1, 0.36, 1) 180ms forwards;
+}
+.landing-scope [data-visible='true'] .m-connector-v {
+  animation: m-extend-y 1200ms cubic-bezier(0.22, 1, 0.36, 1) 180ms forwards;
+}
+
+/* ---- Marquee ---- */
+.landing-scope .m-marquee-track {
+  animation: m-marquee var(--marquee-duration, 64s) linear infinite;
+  width: max-content;
+}
+.landing-scope .m-marquee:hover .m-marquee-track,
+.landing-scope .m-marquee:focus-within .m-marquee-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-scope [data-reveal],
+  .landing-scope [data-reveal][data-visible='true'] {
+    opacity: 1;
+    animation: none;
+  }
+  .landing-scope .m-sym-draw,
+  .landing-scope .m-draw-on-reveal,
+  .landing-scope [data-visible='true'] .m-draw-on-reveal {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+  .landing-scope .m-sym-enter {
+    opacity: 1;
+  }
+  .landing-scope .m-marquee-track,
+  .landing-scope .group\/sym:hover .m-sym-draw,
+  .landing-scope .group\/sym:hover .m-sym-enter {
+    animation: none;
+  }
+  .landing-scope .m-connector,
+  .landing-scope .m-connector-v,
+  .landing-scope [data-visible='true'] .m-connector,
+  .landing-scope [data-visible='true'] .m-connector-v {
+    transform: none;
+    animation: none;
+  }
 }

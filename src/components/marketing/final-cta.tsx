@@ -2,39 +2,54 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 import { buttonVariants } from '@/components/ui/button';
-import { PRODUCT_NAME } from '@/lib/marketing/product';
+import { Band, Heading } from './section';
+import { Reveal } from './reveal';
 
 export function FinalCTA() {
   return (
-    <section className="border-t border-border bg-card-2">
-      <div className="mx-auto max-w-3xl px-6 py-20 text-center sm:py-24">
-        <h2 className="text-[clamp(1.75rem,3.6vw,2.75rem)] leading-[1.1] font-medium tracking-tight text-foreground [font-family:var(--font-display)]">
-          Run your next WhatsApp campaign with a plan, not a guess.
-        </h2>
-        <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Connect WhatsApp, add your contacts, and see your first cost
-          estimate in minutes — free to start with {PRODUCT_NAME}.
-        </p>
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link
-            href="/signup"
-            className={buttonVariants({ size: 'lg', className: 'h-11 px-6 text-[15px]' })}
-          >
-            Start free
-            <ArrowRight className="size-4" />
-          </Link>
-          <Link
-            href="/login"
-            className={buttonVariants({
-              variant: 'outline',
-              size: 'lg',
-              className: 'h-11 px-6 text-[15px]',
-            })}
-          >
-            Sign in
-          </Link>
+    <Band>
+      <div className="relative overflow-hidden">
+        <div
+          aria-hidden
+          className="m-dotfield pointer-events-none absolute inset-0 [mask-image:radial-gradient(70%_60%_at_50%_50%,black,transparent)]"
+        />
+        <div className="relative mx-auto max-w-6xl px-6 py-28 sm:px-10 sm:py-36">
+          <Reveal>
+            {/* The measure lives on the heading, not the wrapper: `ch`
+                resolves against the element's own font-size, so a 20ch
+                cap on a 16px wrapper would be ~160px wide and shatter a
+                64px display line into one word per row. */}
+            <Heading level={2} size="lg" className="max-w-[22ch]">
+              Send the next one with a number, not a guess.
+            </Heading>
+          </Reveal>
+
+          <Reveal delay={110}>
+            <p className="mt-7 max-w-[46ch] text-[15px] leading-[1.7] text-muted-foreground sm:text-base">
+              Connect WhatsApp, import your contacts, and see your first cost
+              estimate in an afternoon.
+            </p>
+
+            <div className="mt-9 flex flex-wrap items-center gap-x-7 gap-y-3">
+              <Link
+                href="/signup"
+                className={buttonVariants({
+                  className: 'group/cta h-11 gap-2 px-5 text-[14px]',
+                })}
+              >
+                Start free
+                <ArrowRight className="size-4 transition-transform duration-200 group-hover/cta:translate-x-0.5" />
+              </Link>
+              <Link
+                href="/login"
+                className="text-[14px] font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              >
+                Sign in
+              </Link>
+            </div>
+          </Reveal>
         </div>
       </div>
-    </section>
+    </Band>
   );
 }

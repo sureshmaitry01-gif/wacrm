@@ -1,132 +1,200 @@
 import Link from 'next/link';
-import { ArrowRight, CircleCheck } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { buttonVariants } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { BrowserFrame } from './browser-frame';
+import { Band, Eyebrow, Heading, Lede } from './section';
+import { AppFrame } from './browser-frame';
+import { CostChip } from './cost-math';
+import { Reveal } from './reveal';
 
-const PROOF_POINTS = [
-  'Shared team inbox',
-  'AI drafts in English, हिंदी & Hinglish',
-  'Cost estimate before you send',
+const CONVERSATIONS = [
+  { initials: 'AR', name: 'Ananya Rao', preview: 'Is the almond croissant in stock?', time: '2m', unread: true, active: true },
+  { initials: 'RM', name: 'Rahul Mehta', preview: 'Thank you 🙏', time: '18m', unread: false, active: false },
+  { initials: 'FK', name: 'Fatima Khan', preview: 'Delivery today?', time: '1h', unread: true, active: false },
+  { initials: 'VS', name: 'Vikram Shah', preview: 'Can I change the order?', time: '3h', unread: false, active: false },
+];
+
+const CONTEXT_ROWS = [
+  { label: 'Tags', value: 'Regular · Diwali-24' },
+  { label: 'From campaign', value: 'Diwali offer — Marketing' },
+  { label: 'Assignee', value: 'Priya S.' },
 ];
 
 export function Hero() {
   return (
-    <div className="relative overflow-hidden">
-      {/* Restrained radial wash, not a purple-gradient hero. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 -top-24 h-[520px] bg-[radial-gradient(60%_60%_at_50%_0%,var(--primary-soft),transparent_70%)]"
-      />
-      <div className="relative mx-auto grid max-w-6xl gap-14 px-6 pt-16 pb-20 sm:pt-24 sm:pb-28 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-10">
-        <div className="lg:pr-6">
-          <Badge
-            variant="outline"
-            className="border-primary/25 bg-primary-soft text-primary"
-          >
-            Built for WhatsApp-first businesses in India
-          </Badge>
+    <Band>
+      <div className="relative overflow-hidden">
+        {/* The page's only gradient, and a hairline column grid beneath
+            it. Both sit far below text contrast — depth you feel before
+            you notice it. */}
+        <div aria-hidden className="m-wash pointer-events-none absolute inset-x-0 top-0 h-[640px]" />
+        <div
+          aria-hidden
+          className="m-gridlines pointer-events-none absolute inset-x-0 top-0 h-[640px] [mask-image:linear-gradient(to_bottom,black,transparent)]"
+        />
 
-          <h1 className="mt-6 text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.05] font-medium tracking-tight text-foreground [font-family:var(--font-display)]">
-            Run WhatsApp campaigns without losing control of the conversation.
-          </h1>
+        <div className="relative mx-auto max-w-6xl px-6 pt-16 sm:px-10 sm:pt-24">
+          {/* Asymmetric masthead: the claim on the left at display size,
+              the explanation and the actions in a narrower column that
+              hangs off its baseline. */}
+          <div className="grid gap-y-9 lg:grid-cols-12 lg:gap-x-12">
+            <Reveal className="lg:col-span-7">
+              <Eyebrow>WhatsApp CRM · India-first</Eyebrow>
+              <Heading level={1} size="lg" className="mt-6 max-w-[15ch]">
+                Run WhatsApp campaigns without losing control of the conversation.
+              </Heading>
+            </Reveal>
 
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-            Send and manage WhatsApp campaigns, work every reply from one
-            shared team inbox, and see what a campaign will cost before it
-            goes out — with AI to help write the message, not send it for
-            you.
-          </p>
+            <Reveal delay={110} className="lg:col-span-5 lg:self-end lg:pb-2">
+              <Lede className="max-w-[42ch]">
+                Campaigns, a shared team inbox, and a cost estimate before
+                anything goes out. AI drafts the message in English, हिंदी or
+                Hinglish — you decide what sends.
+              </Lede>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Link
-              href="/signup"
-              className={buttonVariants({
-                size: 'lg',
-                className: 'h-11 px-6 text-[15px]',
-              })}
-            >
-              Start free
-              <ArrowRight className="size-4" />
-            </Link>
-            <a
-              href="#product"
-              className={buttonVariants({
-                variant: 'outline',
-                size: 'lg',
-                className: 'h-11 px-6 text-[15px]',
-              })}
-            >
-              See how it works
-            </a>
+              <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
+                <Link
+                  href="/signup"
+                  className={buttonVariants({
+                    className: 'group/cta h-11 gap-2 px-5 text-[14px]',
+                  })}
+                >
+                  Start free
+                  <ArrowRight className="size-4 transition-transform duration-200 group-hover/cta:translate-x-0.5" />
+                </Link>
+                <a
+                  href="#product"
+                  className="group/link inline-flex items-center gap-1.5 text-[14px] font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  See how it works
+                  <ArrowRight className="size-3.5 text-muted-foreground transition-transform duration-200 group-hover/link:translate-x-0.5" />
+                </a>
+              </div>
+
+              <p className="mt-7 text-[11.5px] leading-relaxed text-muted-foreground [font-family:var(--font-plex)]">
+                No card to start · Bring your own WhatsApp Business number
+              </p>
+            </Reveal>
           </div>
-
-          <ul className="mt-9 flex flex-col gap-2.5 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
-            {PROOF_POINTS.map((point) => (
-              <li key={point} className="flex items-center gap-2">
-                <CircleCheck className="size-4 shrink-0 text-primary" />
-                {point}
-              </li>
-            ))}
-          </ul>
         </div>
 
-        {/* Asymmetric visual: offset up/right of the grid cell so it breaks
-            the centered-hero pattern rather than sitting in a bento tile.
-            Extra bottom/left padding on this wrapper (not on the frame
-            itself) reserves room for the floating cost card so it sits in
-            genuine whitespace instead of overlapping the mockup's own
-            content — the frame's box never shrinks to make room for it. */}
-        <div className="lg:translate-y-4">
-          <BrowserFrame title="Shared inbox — Priya's Kitchen">
-            <div className="grid grid-cols-[minmax(0,120px)_1fr] divide-x divide-border text-xs sm:grid-cols-[140px_1fr]">
-              <div className="space-y-1 p-2">
-                {[
-                  { name: 'Ananya Rao', preview: 'Is this in stock?', unread: true },
-                  { name: 'Rahul Mehta', preview: 'Thank you 🙏', unread: false },
-                  { name: 'Fatima Khan', preview: 'Delivery today?', unread: true },
-                ].map((c) => (
-                  <div
-                    key={c.name}
-                    className={`rounded-md px-2 py-2 ${c.unread ? 'bg-primary-soft' : ''}`}
-                  >
-                    <p className="truncate font-medium text-foreground">{c.name}</p>
-                    <p className="truncate text-muted-foreground">{c.preview}</p>
+        {/* The product is the hero image. One frame, wider than the text
+            column, showing the screen the team actually lives in. */}
+        <div className="relative mx-auto mt-14 max-w-[1280px] px-6 pb-24 sm:mt-20 sm:px-10 lg:pb-32">
+          <Reveal variant="frame" delay={180} className="relative">
+            <AppFrame title="wacrm / inbox — Priya's Kitchen">
+              <div className="grid divide-border sm:grid-cols-[190px_1fr] sm:divide-x lg:grid-cols-[220px_1fr_236px]">
+                {/* Conversation list */}
+                <div className="hidden flex-col sm:flex">
+                  <div className="flex items-center justify-between border-b border-border px-3.5 py-3">
+                    <span className="text-[12px] font-medium text-foreground">Inbox</span>
+                    <span className="rounded bg-primary-soft px-1.5 py-0.5 text-[10px] text-primary [font-family:var(--font-plex)]">
+                      2 new
+                    </span>
                   </div>
-                ))}
-              </div>
-              <div className="flex flex-col justify-between p-4">
-                <div className="space-y-2">
-                  <div className="ml-auto max-w-[75%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-primary-foreground">
-                    Hi! Yes, the almond croissants are in stock today.
+                  <div className="flex gap-1 border-b border-border px-3 py-2">
+                    {['All', 'Mine', 'Open'].map((f, i) => (
+                      <span
+                        key={f}
+                        className={
+                          i === 0
+                            ? 'rounded bg-foreground px-2 py-0.5 text-[10px] text-background'
+                            : 'rounded px-2 py-0.5 text-[10px] text-muted-foreground'
+                        }
+                      >
+                        {f}
+                      </span>
+                    ))}
                   </div>
-                  <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-foreground">
-                    Perfect, I&apos;ll come by at 5.
-                  </div>
+                  {CONVERSATIONS.map((c) => (
+                    <div
+                      key={c.name}
+                      className={`flex items-start gap-2.5 border-b border-border px-3 py-2.5 last:border-b-0 ${c.active ? 'bg-mint' : ''}`}
+                    >
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-card-2 text-[10px] font-medium text-muted-foreground ring-1 ring-border">
+                        {c.initials}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="truncate text-[12px] font-medium text-foreground">{c.name}</p>
+                          <span className="shrink-0 text-[10px] text-muted-foreground [font-family:var(--font-plex)]">
+                            {c.time}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{c.preview}</p>
+                      </div>
+                      {c.unread ? (
+                        <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-signal" />
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
-                <div className="mt-4 flex items-center justify-between rounded-lg border border-border bg-card-2 px-3 py-2">
-                  <span className="text-muted-foreground">Assigned to Priya</span>
-                  <span className="font-medium text-primary">Open</span>
-                </div>
-              </div>
-            </div>
-          </BrowserFrame>
 
-          {/* Normal document flow, not absolutely positioned: a fixed
-              negative margin gives a bounded, predictable "tucked corner"
-              overlap (independent of the frame's content height) instead
-              of risking covering the mockup's own text at some viewport
-              widths. */}
-          <div className="-mt-5 ml-6 hidden w-48 rounded-xl border border-border bg-card p-3 text-xs leading-tight shadow-[0_16px_40px_-16px_oklch(0_0_0/0.25)] lg:block">
-            <p className="text-muted-foreground">Estimated campaign cost</p>
-            <p className="mt-1 text-lg font-semibold text-foreground">
-              ~₹432 <span className="text-xs font-normal text-muted-foreground">/ 500 sent</span>
-            </p>
-            <p className="mt-1 text-muted-foreground">Illustrative · assumptions shown before send</p>
-          </div>
+                {/* Thread */}
+                <div className="flex min-h-[340px] flex-col sm:min-h-[400px]">
+                  <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[12.5px] font-medium text-foreground">Ananya Rao</p>
+                      <p className="truncate text-[10.5px] text-muted-foreground [font-family:var(--font-plex)]">
+                        +91 98••• ••42
+                      </p>
+                    </div>
+                    <span className="flex shrink-0 items-center gap-1.5 rounded border border-border px-2 py-1 text-[10px] text-muted-foreground">
+                      <span aria-hidden className="size-1.5 rounded-full bg-signal" />
+                      Open
+                    </span>
+                  </div>
+
+                  <div className="flex flex-1 flex-col justify-end gap-2.5 p-4">
+                    <div className="max-w-[78%] rounded-lg rounded-tl-sm bg-card-2 px-3 py-2 text-[12.5px] leading-relaxed text-foreground ring-1 ring-border">
+                      Hi! Saw your Diwali message. Is the almond croissant in
+                      stock?
+                    </div>
+                    <div className="ml-auto max-w-[78%] rounded-lg rounded-tr-sm bg-primary px-3 py-2 text-[12.5px] leading-relaxed text-primary-foreground">
+                      Yes — fresh batch out at 4pm today. Want me to hold two?
+                    </div>
+                    <div className="max-w-[78%] rounded-lg rounded-tl-sm bg-card-2 px-3 py-2 text-[12.5px] leading-relaxed text-foreground ring-1 ring-border">
+                      Perfect, I&apos;ll come by at 5.
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+                    <span className="flex-1 truncate rounded border border-border px-2.5 py-1.5 text-[11.5px] text-muted-foreground">
+                      Reply as Priya S.…
+                    </span>
+                    <span className="rounded bg-foreground px-2.5 py-1.5 text-[11px] text-background">
+                      Send
+                    </span>
+                  </div>
+                </div>
+
+                {/* Context panel */}
+                <div className="hidden flex-col gap-5 p-4 lg:flex">
+                  <div>
+                    <p className="text-[10px] tracking-[0.14em] text-muted-foreground uppercase [font-family:var(--font-plex)]">
+                      Contact
+                    </p>
+                    <p className="mt-2 text-[12.5px] font-medium text-foreground">Ananya Rao</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">Customer since Mar 2025</p>
+                  </div>
+                  {CONTEXT_ROWS.map((row) => (
+                    <div key={row.label}>
+                      <p className="text-[10px] tracking-[0.14em] text-muted-foreground uppercase [font-family:var(--font-plex)]">
+                        {row.label}
+                      </p>
+                      <p className="mt-1.5 text-[11.5px] leading-relaxed text-foreground">{row.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </AppFrame>
+
+            {/* The estimate straddles the frame's bottom edge — half in
+                the product, half in the page. */}
+            <CostChip className="absolute bottom-0 left-10 hidden translate-y-1/2 lg:block" />
+          </Reveal>
         </div>
       </div>
-    </div>
+    </Band>
   );
 }

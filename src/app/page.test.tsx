@@ -43,6 +43,37 @@ describe('RootPage (/)', () => {
     expect(html).toContain('Agency')
   })
 
+  it('ships the claims that keep the marketing honest', async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: null })
+    const html = renderToStaticMarkup(await RootPage())
+
+    // We are not a Meta partner and must never imply it.
+    expect(html).toContain(
+      'Not affiliated with, endorsed by, or a partner of WhatsApp or Meta.',
+    )
+    // Cost figures are estimates against a rate card Meta controls, and
+    // the page has to say so next to the numbers it shows.
+    expect(html).toMatch(/Illustrative/)
+    expect(html).toMatch(/Meta sets these rates and can change them/)
+    // The legal/support routes exist and are linked, not dead ends.
+    for (const href of ['/privacy', '/terms', '/support']) {
+      expect(html).toContain(`href="${href}"`)
+    }
+  })
+
+  it('does not invent social proof', async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: null })
+    const html = renderToStaticMarkup(await RootPage())
+
+    // Guard against the usual fabrications creeping back in: this
+    // product has no named customers, no testimonials, and no
+    // certifications yet.
+    expect(html).not.toMatch(/trusted by/i)
+    expect(html).not.toMatch(/customers worldwide/i)
+    expect(html).not.toMatch(/\bSOC ?2\b/i)
+    expect(html).not.toMatch(/ISO ?27001/i)
+  })
+
   it('redirects a signed-in user to /dashboard (unchanged prior behavior)', async () => {
     getUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },

@@ -1,45 +1,64 @@
-import { Section, SectionHeader } from './section';
+import { Band, Inner, Eyebrow, Heading, Lede } from './section';
+import { CostEquation } from './cost-math';
+import { Reveal } from './reveal';
 
 const PRINCIPLES = [
   {
-    title: 'No hidden platform markup',
-    body: 'Your platform fee is a flat monthly plan price. Meta’s per-message cost is shown as its own line — we don’t add a markup on top of it.',
+    label: 'No markup',
+    body: 'Your plan fee is the platform. Meta’s per-message cost is its own line, and we do not add anything on top of it.',
   },
   {
-    title: 'Assumptions shown, not buried',
-    body: 'Every estimate states its category, the delivery assumption used, and where the rate came from — not just a single confident-looking number.',
+    label: 'Assumptions shown',
+    body: 'Every estimate states its category, the delivery assumption used, and where the rate came from.',
   },
   {
-    title: 'Conservative by design',
-    body: 'The estimator prices every message as billable and skips volume discounts, so real bills tend to come in at or under the estimate, not over it.',
+    label: 'Deliberately conservative',
+    body: 'Every message is priced as billable and no volume discount is assumed, so real bills tend to land at or under the estimate.',
   },
   {
-    title: 'Rates can change — we say so',
-    body: 'WhatsApp messaging rates are set by Meta and change over time. Estimates carry a clear caveat rather than pretending to be a locked-in quote.',
+    label: 'Rates move',
+    body: 'WhatsApp messaging rates are set by Meta and change over time. An estimate is an estimate, not a locked quote.',
   },
 ];
 
 export function Economics() {
   return (
-    <Section>
-      <SectionHeader
-        eyebrow="Transparent economics"
-        title="Estimate campaign costs before sending — with the math shown."
-        subtitle="This is one of the things we care about most: no surprise bill, no guessing what a campaign will cost."
-      />
-      <div className="mt-12 grid gap-x-10 gap-y-9 sm:grid-cols-2">
-        {PRINCIPLES.map((p) => (
-          <div
-            key={p.title}
-            className="rounded-xl border border-border bg-card p-5 shadow-card"
-          >
-            <h3 className="text-[15px] font-semibold text-foreground">{p.title}</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-              {p.body}
-            </p>
-          </div>
-        ))}
-      </div>
-    </Section>
+    <Band>
+      <Inner>
+        <Reveal className="max-w-[46rem]">
+          <Eyebrow>Transparent economics</Eyebrow>
+          <Heading className="mt-5">
+            The estimate is an equation, not a number to trust.
+          </Heading>
+          <Lede className="mt-5">
+            Campaign cost is the one thing teams find out too late. So the app
+            shows the whole calculation — the audience you chose, the rate it
+            used, and the assumption behind it — before anything sends.
+          </Lede>
+        </Reveal>
+
+        {/* The page's signature moment. */}
+        <Reveal delay={140} className="mt-14 sm:mt-16">
+          <CostEquation />
+          <p className="mt-5 text-[12.5px] text-muted-foreground [font-family:var(--font-plex)]">
+            Figures illustrative · See the assumptions behind the estimate on the
+            review step
+          </p>
+        </Reveal>
+
+        <Reveal delay={80} className="mt-16 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+          {PRINCIPLES.map((p) => (
+            <div key={p.label}>
+              <p className="text-[10.5px] tracking-[0.16em] text-muted-foreground uppercase [font-family:var(--font-plex)]">
+                {p.label}
+              </p>
+              <p className="mt-3 max-w-[34ch] text-[13px] leading-[1.65] text-foreground">
+                {p.body}
+              </p>
+            </div>
+          ))}
+        </Reveal>
+      </Inner>
+    </Band>
   );
 }

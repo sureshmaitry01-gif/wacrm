@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
-import { Inter, Fraunces } from "next/font/google";
+import { Inter, Schibsted_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
@@ -20,14 +20,29 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-// Editorial display serif — used ONLY by the public marketing page's
-// headings (scoped via `.landing-scope` in globals.css), never applied
-// app-wide. The authenticated app keeps its Inter-only type system
-// unchanged; this just gives the marketing page a distinct voice.
-const fraunces = Fraunces({
+// ---------------------------------------------------------------------
+// Marketing type system. Both faces are used ONLY by the public site
+// (`.landing-scope`); the authenticated app keeps its Inter-only type
+// system untouched.
+//
+// Display: a compact editorial grotesque. Narrower and tighter-apertured
+// than Inter, so headings read as a different voice rather than as Inter
+// set large. (An earlier pass used Fraunces here; a display serif pulled
+// the page toward a magazine and away from the precise, instrument-like
+// direction the product actually needs.)
+const schibsted = Schibsted_Grotesk({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["500", "600"],
+});
+
+// Utility/data: this product's argument is arithmetic — recipients ×
+// per-message rate = estimated cost. Mono carries the figures, rate
+// cards, category labels and eyebrows so the numbers read as measured
+// values rather than marketing copy.
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex",
+  subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -102,7 +117,7 @@ export default async function RootLayout({
       lang={locale}
       data-theme={DEFAULT_THEME}
       data-mode={DEFAULT_MODE}
-      className={`${inter.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${inter.variable} ${schibsted.variable} ${plexMono.variable} h-full antialiased`}
       // The `theme-boot` script below rewrites `data-theme` and
       // `data-mode` on <html> from localStorage before React hydrates,
       // so for any non-default choice the client DOM intentionally
