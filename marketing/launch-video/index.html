@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PayPerDM Launch Film</title>
+<style>
+  @font-face { font-family: 'Manrope'; font-weight: 200 800; src: url(fonts/manrope-latin.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Manrope'; font-weight: 200 800; src: url(fonts/manrope-latinext.woff2) format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Jakarta'; font-weight: 800; src: url(fonts/jakarta-latin.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Jakarta'; font-weight: 800; src: url(fonts/jakarta-latinext.woff2) format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+  :root {
+    --bg: #F6F3EC; --card: #FFFFFF; --ink: #14201B; --ink2: #5F6964; --ink3: #9AA09A;
+    --line: #E8E3D9; --green: #176B52; --green-ink: #0F5A44; --mint: #DFF5EA; --sand: #F1EDE3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+  body { font-family: 'Manrope', 'Noto Color Emoji', sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+  #stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+  #world { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-origin: 0 0; }
+  .abs { position: absolute; left: 0; top: 0; }
+  .disp { font-family: 'Jakarta', 'Noto Color Emoji', sans-serif; font-weight: 800; letter-spacing: -0.035em; }
+  .acc { color: var(--green); }
+
+  /* captions */
+  #caps { position: absolute; left: 84px; top: 196px; width: 912px; }
+  .cap { position: absolute; left: 0; top: 0; width: 912px; font-size: 84px; line-height: 1.04; }
+  .ln { display: block; white-space: nowrap; }
+  .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 0.02em 0.14em; margin-bottom: -0.14em; }
+  .w > span { display: inline-block; }
+
+  /* phone */
+  #phone { width: 600px; height: 1220px; border-radius: 82px; background: #18231E; padding: 14px;
+    box-shadow: 0 60px 90px -40px rgba(20,40,30,.45), 0 4px 10px rgba(20,40,30,.15); }
+  #screen { position: relative; width: 572px; height: 1192px; border-radius: 68px; background: #fff; overflow: hidden; }
+  .sbar { position: absolute; left: 0; top: 0; width: 100%; height: 56px; display: flex; justify-content: space-between;
+    align-items: center; padding: 10px 48px 0; font-weight: 700; font-size: 22px; }
+  .notch { position: absolute; left: 50%; top: 14px; width: 150px; height: 38px; margin-left: -75px; background: #18231E; border-radius: 20px; }
+  .chead { position: absolute; left: 0; top: 56px; width: 100%; height: 100px; display: flex; align-items: center; gap: 18px;
+    padding: 0 30px; border-bottom: 1px solid var(--line); }
+  .av { width: 64px; height: 64px; border-radius: 50%; background: #F3D9C9; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 24px; color: #7A4A33; }
+  .cname { font-weight: 800; font-size: 28px; line-height: 1.1; }
+  .csub { font-size: 20px; color: var(--ink3); font-weight: 600; }
+  #unread { margin-left: auto; height: 44px; min-width: 44px; padding: 0 14px; border-radius: 22px; background: var(--green); color: #fff;
+    font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center; }
+  .thread { position: absolute; left: 0; top: 156px; width: 100%; height: 936px; overflow: hidden; }
+  .tin { position: absolute; left: 0; top: 0; width: 100%; padding: 0 22px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 460px; padding: 20px 28px; border-radius: 34px; font-size: 35px; font-weight: 600; line-height: 1.25; }
+  .msg.in { align-self: flex-start; background: #EFEDE8; border-bottom-left-radius: 10px; transform-origin: 0 100%; }
+  .msg.out { align-self: flex-end; background: var(--green); color: #fff; border-bottom-right-radius: 10px; transform-origin: 100% 100%; }
+  .msg.big { font-size: 46px; }
+  .shotmsg { padding: 10px; }
+  .shotmsg .shot { width: 250px; height: 250px; }
+  .comp { position: absolute; left: 0; bottom: 0; width: 100%; height: 100px; padding: 18px 26px; border-top: 1px solid var(--line); }
+  .comp div { height: 64px; border-radius: 32px; background: #F3F1EC; font-size: 24px; color: var(--ink3); display: flex; align-items: center; padding: 0 28px; font-weight: 600; }
+
+  /* fake payment screenshot used in chaos */
+  .shot { border-radius: 22px; background: #F4F4F2; border: 2px solid #E2E0DA; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 10px; color: #3a3f3c; }
+  .shot .ck { width: 64px; height: 64px; border-radius: 50%; background: #8E9692; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 800; }
+  .shot b { font-size: 40px; font-weight: 800; }
+  .shot i { font-style: normal; font-size: 20px; color: #7d837f; font-weight: 600; }
+
+  /* chaos cards */
+  .chaos { background: #fff; border-radius: 36px; padding: 24px 32px; font-size: 39px; font-weight: 700; line-height: 1.2; white-space: nowrap;
+    box-shadow: 0 24px 40px -18px rgba(20,40,30,.28), 0 2px 6px rgba(20,40,30,.08); }
+  .chaos.shotcard { padding: 14px; }
+  .chaos.shotcard .shot { width: 290px; height: 330px; }
+  .chaos .fn { display: block; font-size: 20px; color: var(--ink3); font-weight: 600; margin-top: 8px; text-align: center; }
+
+  /* the one morphing object */
+  #box { overflow: hidden; }
+  .layer { position: absolute; left: 0; top: 0; }
+  .P { font-family: 'Jakarta'; font-weight: 800; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+  /* link card */
+  .lk { width: 860px; height: 560px; padding: 44px 48px; }
+  .lk .row { display: flex; align-items: center; gap: 18px; }
+  .lk .seller { width: 72px; height: 72px; border-radius: 50%; background: var(--mint); color: var(--green); font-weight: 800; font-size: 28px; display: flex; align-items: center; justify-content: center; }
+  .lk .sname { font-weight: 800; font-size: 34px; }
+  .lk .via { font-size: 24px; color: var(--ink3); font-weight: 600; }
+  .lk .item { margin-top: 34px; font-size: 38px; font-weight: 700; }
+  .lk .amt { margin-top: 6px; font-size: 72px; }
+  .lk .url { margin-top: 10px; font-size: 28px; color: var(--green); font-weight: 700; display: flex; gap: 10px; align-items: center; }
+  .lk .btn { position: absolute; left: 48px; right: 48px; bottom: 44px; height: 96px; border-radius: 26px; background: var(--green); color: #fff;
+    font-size: 34px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+  /* checkout */
+  .co { width: 572px; height: 1192px; padding: 0 34px; }
+  .co .top { padding-top: 76px; display: flex; justify-content: space-between; align-items: center; }
+  .co .shop { font-weight: 800; font-size: 34px; }
+  .co .sec { font-size: 21px; color: var(--green); font-weight: 700; }
+  .co .sum { margin-top: 26px; background: var(--sand); border-radius: 26px; padding: 22px 26px; display: flex; justify-content: space-between; align-items: center; }
+  .co .sum b { display: block; font-size: 27px; font-weight: 800; }
+  .co .sum span { font-size: 22px; color: var(--ink2); font-weight: 600; }
+  .co .sum .p { font-size: 32px; font-weight: 800; }
+  .co .lab { margin-top: 26px; font-size: 22px; color: var(--ink2); font-weight: 700; }
+  .co .in { margin-top: 10px; height: 78px; border-radius: 20px; border: 2px solid var(--line); padding: 0 22px; display: flex; align-items: center;
+    font-size: 30px; font-weight: 700; white-space: nowrap; overflow: hidden; }
+  .co .in.tall { height: 118px; align-items: flex-start; padding-top: 18px; white-space: normal; line-height: 1.3; font-size: 28px; }
+  .co .caret { display: inline-block; width: 3px; height: 34px; background: var(--green); margin-left: 2px; vertical-align: middle; }
+  .co .tot { margin-top: 30px; padding-top: 24px; border-top: 2px dashed var(--line); display: flex; justify-content: space-between; font-size: 32px; font-weight: 800; }
+  .co .pay { position: relative; margin-top: 26px; height: 104px; border-radius: 28px; overflow: hidden; }
+  .co .pay .lbl { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 34px; font-weight: 800; }
+  .vck { width: 46px; height: 46px; border-radius: 50%; background: var(--green); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; }
+
+  /* order card */
+  .od { width: 900px; padding: 50px 56px; }
+  .od .hd { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .od .eyebrow { font-size: 24px; letter-spacing: .12em; font-weight: 800; color: var(--green); text-transform: uppercase; }
+  .od .oid { color: var(--ink3); letter-spacing: .02em; }
+  .od .amtrow { margin-top: 18px; display: flex; align-items: center; gap: 26px; height: 120px; }
+  .od .amt { font-size: 100px; line-height: 1; }
+  .badge { height: 64px; padding: 0 26px 0 12px; border-radius: 32px; background: var(--mint); color: var(--green-ink); font-size: 27px; font-weight: 800;
+    display: inline-flex; align-items: center; gap: 12px; transform-origin: 0 50%; white-space: nowrap; }
+  .badge .vck { width: 42px; height: 42px; font-size: 22px; }
+  .od .rows { position: absolute; left: 56px; top: 270px; width: 788px; border-top: 2px solid var(--line); }
+  .od .r { padding-top: 26px; height: 124px; }
+  .od .r.tall { height: 160px; }
+  .od .r .k { font-size: 23px; color: var(--ink3); font-weight: 700; }
+  .od .r .v { font-size: 35px; font-weight: 700; margin-top: 6px; line-height: 1.25; }
+  .pill { position: absolute; height: 60px; border-radius: 30px; overflow: hidden; }
+  .pill .pl { position: absolute; left: 0; top: 0; height: 60px; line-height: 60px; padding: 0 26px; font-size: 26px; font-weight: 800; white-space: nowrap; }
+  .tl { position: absolute; left: 56px; top: 270px; width: 788px; border-top: 2px solid var(--line); padding-top: 34px; }
+  .st { position: relative; height: 110px; padding-left: 92px; }
+  .st .dot { position: absolute; left: 0; top: 0; width: 56px; height: 56px; border-radius: 50%; border: 3px solid #D8D3C7; background: #fff; }
+  .st .fill { position: absolute; left: -3px; top: -3px; width: 56px; height: 56px; border-radius: 50%; background: var(--green); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; }
+  .st .bar { position: absolute; left: 25px; top: 62px; width: 6px; height: 42px; border-radius: 3px; background: #E3DED3; overflow: hidden; }
+  .st .bar i { position: absolute; left: 0; top: 0; width: 6px; height: 42px; background: var(--green); transform-origin: 50% 0; }
+  .st .n { font-size: 36px; font-weight: 800; line-height: 1.1; }
+  .st .s { font-size: 23px; color: var(--ink3); font-weight: 600; margin-top: 4px; }
+
+  /* tracking card */
+  #track { width: 860px; height: 430px; background: #fff; border-radius: 44px; padding: 40px 48px;
+    box-shadow: 0 40px 70px -30px rgba(20,40,30,.35), 0 2px 8px rgba(20,40,30,.08); }
+  #track .hd { display: flex; align-items: center; gap: 14px; font-size: 24px; color: var(--ink2); font-weight: 700; }
+  #track .lg { width: 44px; height: 44px; border-radius: 12px; background: var(--green); font-size: 26px; }
+  #track .stat { position: relative; margin-top: 18px; height: 80px; font-size: 66px; line-height: 80px; }
+  #track .stat .w { position: absolute; left: 0; top: 0; }
+  #track .meta { font-size: 25px; color: var(--ink2); font-weight: 600; margin-top: 8px; }
+  #track .prog { position: absolute; left: 60px; right: 60px; top: 300px; height: 8px; border-radius: 4px; background: #E8E3D9; }
+  #track .prog i { position: absolute; left: 0; top: 0; height: 8px; border-radius: 4px; background: var(--green); width: 100%; transform-origin: 0 50%; }
+  #track .pd { position: absolute; top: -12px; width: 32px; height: 32px; margin-left: -16px; border-radius: 50%; background: #fff; border: 4px solid #D8D3C7; }
+  #track .pl2 { position: absolute; top: 340px; width: 180px; margin-left: -90px; text-align: center; font-size: 21px; font-weight: 700; color: var(--ink3); }
+
+  /* screenshot + touch */
+  #shotWB { width: 865px; height: 372px; border-radius: 34px; overflow: hidden; box-shadow: 0 40px 70px -30px rgba(20,40,30,.35), 0 2px 8px rgba(20,40,30,.08); }
+  #shotWB img { width: 865px; height: 372px; display: block; }
+  #touch { width: 92px; height: 92px; border-radius: 50%; background: rgba(255,255,255,.9); border: 3px solid rgba(20,32,27,.18);
+    box-shadow: 0 10px 24px rgba(20,40,30,.25); }
+  .ripple { width: 100px; height: 100px; border-radius: 50%; border: 6px solid var(--green); }
+
+  /* end */
+  .end { position: absolute; left: 0; top: 0; }
+  #endLogo { display: flex; align-items: center; gap: 22px; }
+  #endLogo .lg { width: 104px; height: 104px; border-radius: 30px; background: var(--green); font-size: 62px; }
+  #endLogo .wm { font-size: 70px; }
+  #endHead { width: 940px; font-size: 98px; line-height: 1.04; }
+  #lockWM { font-size: 128px; white-space: nowrap; }
+  #endSub { font-size: 46px; font-weight: 700; color: var(--ink2); }
+  #cta { width: 430px; height: 120px; border-radius: 60px; background: var(--green); color: #fff; font-size: 44px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; gap: 16px; box-shadow: 0 24px 40px -20px rgba(23,107,82,.6); }
+  #ctaUrl { font-size: 40px; font-weight: 800; color: var(--ink); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world"></div>
+  <div id="caps"></div>
+</div>
+<script type="module" src="film.js"></script>
+</body>
+</html>
