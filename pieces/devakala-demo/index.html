@@ -1,0 +1,1559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Devakala demo</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0e18; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { height: min(100vh, calc(100vw * 16 / 9)); width: auto; aspect-ratio: 9 / 16; display: block; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+"use strict";
+// =====================================================================
+//  DEVAKALA DEMO — 9:16, 8.0s @ 120 BPM, 24fps.
+//  Era 1 (cosmic night): Shesha's dream — reclining figure, lotus rising.
+//  Era 2 (parchment day): the garden — halo, bloomed lotus, foliage.
+//  Bridge: the cosmic disc (top of era 1) → the golden halo (era 2).
+// =====================================================================
+const FPS = 24, W = 1080, H = 1920;
+const BPM = 120, BEAT = 60 / BPM, E8 = BEAT / 2, E16 = BEAT / 4;
+const DURATION = 8.0;
+const NFRAMES = Math.round(DURATION * FPS);
+const LOOP_T = NFRAMES / FPS;
+const SAFE = { top: 240, bottom: 420, right: 140 };
+const HAND = '"Palatino Linotype", "Palatino", "Book Antiqua", "Georgia", serif';   // classical serif — Windows, macOS, Linux
+const CX = 540;
+
+// eras: [t0, t1, scene function]
+const ERA_LIST = [[0, 4, () => sceneCosmic()], [4, 8, () => sceneGarden()]];
+const SHOTS = [
+  ['cosmic',  0,  0.0, 4.0, 'Shesha\'s dream — the lotus rises'],
+  ['garden',  1,  4.0, 8.0, 'the cosmic disc opens into the halo; the garden blooms'],
+];
+const TIMELINE = {
+  width: W, height: H, fps: FPS, bpm: BPM, duration: DURATION, frames: NFRAMES, loop: LOOP_T, safe: SAFE,
+  format: 'morph-chain',
+  shots: SHOTS.map(([key, era, t0, t1, title], i) => ({ id: i + 1, key, era, t0, t1, title })),
+  cuts: [],
+  morphs: [4.0],
+  cues: { lotusRise: 1.2, bloom: 4.8 },
+  acts: [
+    { name: '1 Cosmic night', role: 'build',   t0: 0.0, t1: 4.0 },
+    { name: '2 Garden',       role: 'gift',    t0: 4.0, t1: 8.0 },
+  ],
+  board: [
+    { t: 2.0,  title: 'the reclining figure, lotus stem rising', sound: 'deep pad, a slow fifth', next: 'the cosmic disc closes in' },
+    { t: 6.0,  title: 'the halo opens, lotus blooms', sound: 'bright chord, pluck cascade', next: 'loops' },
+  ],
+  narration: [],
+};
+window.TIMELINE = TIMELINE;
+// =====================================================================
+//  kit/core.js — seeded RNG, math, easing, palette, geometry, the hand-drawn drawing kit
+//  (wobble on the boil, ink, paint, hatch, pencil, stipple, grain), cameras, mono text.
+//  Needs from the piece head: FPS, W, H. Render state: ctx, F (frame), B (boil = floor(F/2)).
+// =====================================================================
+
+// ---------------------------------------------------------------------
+//  seeded RNG
+// ---------------------------------------------------------------------
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hash(...xs) {
+  let h = 2166136261 >>> 0;
+  for (const x of xs) {
+    const s = String(x);
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    h ^= 124; h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function RNG(...xs) {
+  const f = mulberry32(hash(...xs));
+  return {
+    f,
+    r: (a, b) => a + (b - a) * f(),
+    n: (amt) => (f() * 2 - 1) * amt,
+    i: (a, b) => a + Math.floor(f() * (b - a + 1)),
+    pick: (arr) => arr[Math.floor(f() * arr.length)],
+  };
+}
+
+// ---------------------------------------------------------------------
+//  math
+// ---------------------------------------------------------------------
+const TAU = Math.PI * 2, DEG = Math.PI / 180;
+const clamp = (x, a = 0, b = 1) => (x < a ? a : x > b ? b : x);
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+// has absolute time t reached cut time c? (cuts snap to the nearest frame, like shot boundaries)
+const past = (t, c) => Math.round(t * FPS + 1e-6) >= Math.round(c * FPS);
+const dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+const EZ = {
+  o2: (t) => 1 - (1 - clamp(t)) ** 2,
+  o3: (t) => 1 - (1 - clamp(t)) ** 3,
+  i2: (t) => clamp(t) ** 2,
+  i3: (t) => clamp(t) ** 3,
+  io: (t) => { t = clamp(t); return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2; },
+  back: (t) => { t = clamp(t) - 1; return 1 + 2.70158 * t * t * t + 1.70158 * t * t; },
+};
+
+// ---------------------------------------------------------------------
+//  render state
+// ---------------------------------------------------------------------
+let ctx = null;   // current 2d context
+let F = 0;        // absolute frame index
+let B = 0;        // boil index — reseeds every 2 frames (Math.floor(t*12))
+
+const C = {
+  ink: '#3a2417', cream: '#efe5cf', paper: '#f4ecd9', paperLine: 'rgba(90,130,190,0.32)',
+  orange: '#e58a4e', orangeD: '#c3622e', orangeL: '#f4b27c', terra: '#d97757',
+  rose: '#d98b8b', roseD: '#b0616a', roseL: '#efb9b0',
+  wood: '#d6a466', woodD: '#a8773f', woodL: '#e9c48f',
+  sky: '#9cc4d6', skyD: '#6f9fb8', skyL: '#c9e1ea',
+  teal: '#3d9f96', tealL: '#86c9be',
+  yellow: '#f0c55a', yellowL: '#f7dd92',
+  green: '#5f9c5c', greenL: '#a3cf92',
+  red: '#d4382c', redL: '#ea7a6c',
+  skin: '#ebb68f', skinD: '#c7815d', skinL: '#f7d4b4',
+  lav: 'rgba(104,112,214,0.7)', lavS: 'rgba(104,112,214,0.42)',
+  navy: '#0c0d1c', navy2: '#15173a', peri: '#c8d0f0', periD: '#7c86c4', periS: 'rgba(150,164,230,0.20)',
+  cyan: '#52d6c4', mag: '#e0368f', glow: '#5de37a', white: '#f4f6ff',
+};
+const RAINBOW = ['#f0d042', '#e050b8', '#46cde0', '#7ad866', '#a47ef0'];
+const MONO = 'Consolas, "Cascadia Mono", Menlo, "DejaVu Sans Mono", "Courier New", monospace';   // Windows first, then macOS / Linux
+
+// ---------------------------------------------------------------------
+//  geometry
+// ---------------------------------------------------------------------
+function ellipsePts(cx, cy, rx, ry, rot = 0, n = 64, a0 = 0, a1 = TAU) {
+  const P = [], c = Math.cos(rot), s = Math.sin(rot), full = Math.abs(a1 - a0 - TAU) < 1e-6;
+  for (let i = 0; i < n; i++) {
+    const a = a0 + (a1 - a0) * i / (full ? n : n - 1);
+    const x = Math.cos(a) * rx, y = Math.sin(a) * ry;
+    P.push([cx + x * c - y * s, cy + x * s + y * c]);
+  }
+  return P;
+}
+function rrectPts(x, y, w, h, r, n = 6) {
+  r = Math.min(r, w / 2, h / 2);
+  const P = [], cs = [[x + w - r, y + r, -Math.PI / 2], [x + w - r, y + h - r, 0], [x + r, y + h - r, Math.PI / 2], [x + r, y + r, Math.PI]];
+  for (const [cx, cy, a0] of cs) for (let i = 0; i <= n; i++) { const a = a0 + (Math.PI / 2) * i / n; P.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+  return P;
+}
+function arcPts(cx, cy, r, a0, a1, n = 18, sy = 1) {
+  const P = [];
+  for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; P.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r * sy]); }
+  return P;
+}
+function xform(P, tx, ty, rot = 0, sx = 1, sy = sx) {
+  const c = Math.cos(rot), s = Math.sin(rot);
+  return P.map(([x, y]) => [tx + x * sx * c - y * sy * s, ty + x * sx * s + y * sy * c]);
+}
+function bbox(P, pad = 0) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const [x, y] of P) { if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+  return { x0: x0 - pad, y0: y0 - pad, x1: x1 + pad, y1: y1 + pad };
+}
+function resample(P, closed, step) {
+  const out = [], n = P.length, m = closed ? n : n - 1;
+  for (let i = 0; i < m; i++) {
+    const a = P[i], b = P[(i + 1) % n], k = Math.max(1, Math.ceil(dist(a, b) / step));
+    for (let j = 0; j < k; j++) out.push([a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k]);
+  }
+  if (!closed) out.push(P[n - 1]);
+  return out;
+}
+function pathLen(P) { let L = 0; for (let i = 1; i < P.length; i++) L += dist(P[i - 1], P[i]); return L; }
+function subPath(P, frac) {
+  let want = pathLen(P) * clamp(frac);
+  const out = [P[0]];
+  for (let i = 1; i < P.length; i++) {
+    const d = dist(P[i - 1], P[i]);
+    if (want >= d) { out.push(P[i]); want -= d; }
+    else { const k = want / (d || 1); out.push([lerp(P[i - 1][0], P[i][0], k), lerp(P[i - 1][1], P[i][1], k)]); break; }
+  }
+  return out;
+}
+function pointAt(P, frac) { const S = subPath(P, frac); return S[S.length - 1]; }
+
+// ---------------------------------------------------------------------
+//  drawing kit — boil, sketchy lines, hatching, stipple, pencil, grain
+// ---------------------------------------------------------------------
+// smooth hand wobble along the normal; reseeded every boil step
+function wobble(P, closed, amt, key, step = 7) {
+  const Q = resample(P, closed, step), n = Q.length;
+  const R = RNG('wob', key, B);
+  const f1 = R.r(0.012, 0.03), f2 = R.r(0.05, 0.1), p1 = R.r(0, TAU), p2 = R.r(0, TAU);
+  const sx = R.n(amt * 0.5), sy = R.n(amt * 0.5);
+  const out = new Array(n); let s = 0;
+  for (let i = 0; i < n; i++) {
+    const a = Q[closed ? (i - 1 + n) % n : Math.max(0, i - 1)], b = Q[closed ? (i + 1) % n : Math.min(n - 1, i + 1)];
+    const nx = a[1] - b[1], ny = b[0] - a[0], l = Math.hypot(nx, ny) || 1;
+    if (i) s += dist(Q[i - 1], Q[i]);
+    const o = amt * (0.75 * Math.sin(s * f1 + p1) + 0.35 * Math.sin(s * f2 + p2));
+    out[i] = [Q[i][0] + nx / l * o + sx, Q[i][1] + ny / l * o + sy];
+  }
+  return out;
+}
+function trace(P, closed) {
+  ctx.beginPath();
+  const n = P.length; if (n < 2) return;
+  if (closed) {
+    ctx.moveTo((P[n - 1][0] + P[0][0]) / 2, (P[n - 1][1] + P[0][1]) / 2);
+    for (let i = 0; i < n; i++) { const p = P[i], q = P[(i + 1) % n]; ctx.quadraticCurveTo(p[0], p[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2); }
+    ctx.closePath();
+  } else {
+    ctx.moveTo(P[0][0], P[0][1]);
+    for (let i = 1; i < n - 1; i++) { const p = P[i], q = P[i + 1]; ctx.quadraticCurveTo(p[0], p[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2); }
+    ctx.lineTo(P[n - 1][0], P[n - 1][1]);
+  }
+}
+// sketchy stroke. o: closed, color, w, amt, key, alpha, frac (write-on), double
+function ink(P, o = {}) {
+  const closed = !!o.closed, key = o.key ?? 'ink';
+  let Q = o.raw ? P : wobble(P, closed, o.amt ?? 1.8, key);
+  let cl = closed;
+  if (o.frac != null && o.frac < 1) { if (o.frac <= 0) return Q; Q = subPath(closed ? [...Q, Q[0]] : Q, o.frac); cl = false; }
+  ctx.strokeStyle = o.color || C.ink; ctx.lineWidth = o.w ?? 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.globalAlpha = o.alpha ?? 1;
+  trace(Q, cl); ctx.stroke();
+  if (o.double) {
+    let Q2 = wobble(P, closed, (o.amt ?? 1.8) * 1.6 + 0.8, key + '~');
+    if (!cl && closed) Q2 = subPath([...Q2, Q2[0]], o.frac ?? 1);
+    ctx.lineWidth = (o.w ?? 3) * 0.4; ctx.globalAlpha = (o.alpha ?? 1) * 0.55; trace(Q2, cl); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  return Q;
+}
+// filled shape + textures (clipped) + ink outline
+function paint(P, o = {}) {
+  const key = o.key || 'paint';
+  const Q = o.raw ? P : wobble(P, true, o.amt ?? 1.6, key);
+  ctx.save();
+  trace(Q, true);
+  if (o.fill) { ctx.globalAlpha = o.fillAl ?? 1; ctx.fillStyle = o.fill; ctx.fill(); ctx.globalAlpha = 1; }
+  if (o.tex) { ctx.clip(); const bb = bbox(Q, 6); o.tex.forEach((t, i) => texture(bb, { key: key + ':' + i, ...t })); }
+  ctx.restore();
+  if (o.line !== false) {
+    ctx.strokeStyle = o.line || C.ink; ctx.lineWidth = o.w ?? 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.globalAlpha = o.lineAl ?? 1; trace(Q, true); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  return Q;
+}
+function texture(bb, t) {
+  if (t.k === 'hatch') hatch(bb, t);
+  else if (t.k === 'cross') { hatch(bb, t); hatch(bb, { ...t, a: (t.a ?? 0.7) + (t.a2 ?? 1.25), key: t.key + 'x' }); }
+  else if (t.k === 'pencil') pencil(bb, t);
+  else if (t.k === 'stipple') stipple(bb, t);
+  else if (t.k === 'fn') t.fn(bb);
+}
+// parallel hatching inside current clip. t: a angle, gap, c, w, al, dash [min,max], skip, dens(x,y)
+function hatch(bb, t) {
+  const a = t.a ?? 0.7, gap = t.gap ?? 7, S = RNG('hs', t.key), R = RNG('hj', t.key, B);
+  const cx = (bb.x0 + bb.x1) / 2, cy = (bb.y0 + bb.y1) / 2, rad = Math.hypot(bb.x1 - bb.x0, bb.y1 - bb.y0) / 2 + 4;
+  const ca = Math.cos(a), sa = Math.sin(a), dens = t.dens, jit = t.jit ?? 0.9, dash = t.dash;
+  ctx.beginPath();
+  for (let d = -rad; d <= rad; d += gap) {
+    const dd = d + S.n(gap * 0.3);
+    let u = -rad + (dash ? S.r(0, dash[1]) : 0);
+    while (u < rad) {
+      const len = dash ? S.r(dash[0], dash[1]) : rad * 2, u2 = Math.min(rad, u + len);
+      const mu = (u + u2) / 2, mx = cx + ca * mu - sa * dd, my = cy + sa * mu + ca * dd, p = S.f();
+      if (!dens || p < dens(mx, my)) {
+        const e1 = R.n(jit), e2 = R.n(jit);
+        ctx.moveTo(cx + ca * u - sa * (dd + e1), cy + sa * u + ca * (dd + e1));
+        ctx.lineTo(cx + ca * u2 - sa * (dd + e2), cy + sa * u2 + ca * (dd + e2));
+      }
+      u = u2 + (dash ? S.r(t.skip?.[0] ?? 3, t.skip?.[1] ?? 12) : 0);
+    }
+  }
+  ctx.strokeStyle = t.c || C.ink; ctx.lineWidth = t.w ?? 1.2; ctx.globalAlpha = t.al ?? 0.5; ctx.lineCap = 'round';
+  ctx.stroke(); ctx.globalAlpha = 1;
+}
+// colored-pencil diagonal strokes
+function pencil(bb, t) {
+  const S = RNG('ps', t.key), R = RNG('pj', t.key, B);
+  const area = (bb.x1 - bb.x0) * (bb.y1 - bb.y0);
+  const n = Math.min(t.max ?? 6000, t.n ?? Math.floor(area / (t.per ?? 700)));
+  const a = t.a ?? -0.95, L = t.len ?? 14, dens = t.dens;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = S.r(bb.x0, bb.x1), y = S.r(bb.y0, bb.y1), p = S.f(), aa = a + S.n(0.22), l = L * (0.5 + S.f() * 0.7);
+    if (dens && p > dens(x, y)) continue;
+    const jx = R.n(1.1), jy = R.n(1.1), dx = Math.cos(aa) * l / 2, dy = Math.sin(aa) * l / 2;
+    ctx.moveTo(x - dx + jx, y - dy + jy); ctx.lineTo(x + dx + jx, y + dy + jy);
+  }
+  ctx.strokeStyle = t.c; ctx.lineWidth = t.w ?? 1.4; ctx.globalAlpha = t.al ?? 0.45; ctx.lineCap = 'round';
+  ctx.stroke(); ctx.globalAlpha = 1;
+}
+// square stipple dots
+function stipple(bb, t) {
+  const S = RNG('ss', t.key), R = RNG('sj', t.key, B);
+  const n = t.n ?? 400, sz = t.s ?? 2.2, dens = t.dens, jit = t.jit ?? 0.8;
+  ctx.fillStyle = t.c; ctx.globalAlpha = t.al ?? 1; ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = S.r(bb.x0, bb.x1), y = S.r(bb.y0, bb.y1), p = S.f(), s = sz * (0.6 + S.f() * 0.8);
+    if (dens && p > dens(x, y)) continue;
+    ctx.rect(x + R.n(jit), y + R.n(jit), s, s);
+  }
+  ctx.fill(); ctx.globalAlpha = 1;
+}
+// screen-space paper grain, reseeded with the boil
+function grain(o = {}) {
+  ctx.save(); screen();
+  const R = RNG('grain', B), n = o.n ?? 2600;
+  ctx.fillStyle = o.dark || 'rgba(70,45,25,0.13)'; ctx.beginPath();
+  for (let i = 0; i < n; i++) ctx.rect(R.r(0, W), R.r(0, H), 1.7, 1.7);
+  ctx.fill();
+  ctx.fillStyle = o.light || 'rgba(255,250,236,0.20)'; ctx.beginPath();
+  for (let i = 0; i < n; i++) ctx.rect(R.r(0, W), R.r(0, H), 1.9, 1.9);
+  ctx.fill();
+  // a few paper fibres
+  ctx.strokeStyle = 'rgba(80,55,35,0.07)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let i = 0; i < 90; i++) { const x = R.r(0, W), y = R.r(0, H), a = R.r(0, TAU), l = R.r(6, 22); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------
+//  construction lines, rulers, sparks, bursts, rainbow contours
+// ---------------------------------------------------------------------
+function construct(cx, cy, r, o = {}) {
+  const R = RNG('con', o.key ?? 'c', B);
+  ctx.save();
+  ctx.strokeStyle = o.c || C.lav; ctx.lineWidth = o.w ?? 1.4; ctx.globalAlpha = o.al ?? 1; ctx.lineCap = 'round';
+  const a0 = (o.a0 ?? R.r(0, TAU)), sw = o.sweep ?? 1.05;
+  ctx.beginPath(); ctx.ellipse(cx + R.n(1.2), cy + R.n(1.2), r, r * (o.sq ?? 1), o.rot ?? 0, a0, a0 + TAU * sw); ctx.stroke();
+  if (o.cross) { const k = o.cross; ctx.beginPath(); ctx.moveTo(cx - k, cy); ctx.lineTo(cx + k, cy); ctx.moveTo(cx, cy - k); ctx.lineTo(cx, cy + k); ctx.stroke(); }
+  if (o.ticks) {
+    ctx.beginPath();
+    for (let i = 0; i < o.ticks; i++) { const a = i / o.ticks * TAU + (o.rot ?? 0); ctx.moveTo(cx + Math.cos(a) * (r - 6), cy + Math.sin(a) * (r - 6)); ctx.lineTo(cx + Math.cos(a) * (r + 6), cy + Math.sin(a) * (r + 6)); }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function cline(x1, y1, x2, y2, o = {}) {
+  const R = RNG('cl', o.key ?? 'l', B);
+  ctx.save(); ctx.strokeStyle = o.c || C.lavS; ctx.lineWidth = o.w ?? 1.2; ctx.globalAlpha = o.al ?? 1;
+  ctx.beginPath(); ctx.moveTo(x1 + R.n(1), y1 + R.n(1)); ctx.lineTo(x2 + R.n(1), y2 + R.n(1)); ctx.stroke(); ctx.restore();
+}
+function ruler(x1, y1, x2, y2, o = {}) {
+  const R = RNG('rul', o.key ?? 'r', B);
+  const L = Math.hypot(x2 - x1, y2 - y1) || 1, ux = (x2 - x1) / L, uy = (y2 - y1) / L, nx = -uy, ny = ux;
+  const frac = clamp(o.frac ?? 1), step = o.step ?? 16, tk = o.tick ?? 7, side = o.side ?? 1;
+  ctx.save(); ctx.strokeStyle = o.c || C.periD; ctx.lineWidth = o.w ?? 1.5; ctx.globalAlpha = o.al ?? 1; ctx.lineCap = 'round';
+  const jx = R.n(0.8), jy = R.n(0.8);
+  ctx.beginPath(); ctx.moveTo(x1 + jx, y1 + jy); ctx.lineTo(x1 + ux * L * frac + jx, y1 + uy * L * frac + jy);
+  const n = Math.floor(L * frac / step);
+  for (let i = 0; i <= n; i++) {
+    const k = i % 5 === 0 ? tk * 1.9 : tk, px = x1 + ux * i * step + jx, py = y1 + uy * i * step + jy;
+    ctx.moveTo(px, py); ctx.lineTo(px + nx * k * side, py + ny * k * side);
+  }
+  ctx.moveTo(x1 - nx * tk * 1.6, y1 - ny * tk * 1.6); ctx.lineTo(x1 + nx * tk * 2.2, y1 + ny * tk * 2.2);
+  if (frac >= 1) { ctx.moveTo(x2 - nx * tk * 1.6, y2 - ny * tk * 1.6); ctx.lineTo(x2 + nx * tk * 2.2, y2 + ny * tk * 2.2); }
+  ctx.stroke(); ctx.restore();
+}
+// glowing radial spark (dark world)
+function sparkBurst(cx, cy, r, o = {}) {
+  if (r <= 0.5) return;
+  const R = RNG('spk', o.key ?? 's', B), n = o.n ?? 18, rays = [];
+  for (let i = 0; i < n; i++) { const a = i / n * TAU + R.n(0.14); rays.push([a, r * R.r(0.28, 0.5), r * R.r(0.72, 1.15)]); }
+  const path = () => { ctx.beginPath(); for (const [a, r0, r1] of rays) { ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); } };
+  ctx.save(); ctx.lineCap = 'round';
+  path(); ctx.strokeStyle = o.glow || 'rgba(82,214,196,0.22)'; ctx.lineWidth = (o.w ?? 2.4) * 3.4; ctx.stroke();
+  path(); ctx.strokeStyle = o.c || '#8ff5e6'; ctx.lineWidth = o.w ?? 2.4; ctx.stroke();
+  if (o.core !== false) {
+    const cr = Math.max(2.5, r * (o.coreR ?? 0.15));
+    ctx.beginPath(); ctx.arc(cx, cy, cr * 2.2, 0, TAU); ctx.fillStyle = 'rgba(190,215,255,0.16)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, cr, 0, TAU); ctx.fillStyle = C.white; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = C.periD; ctx.stroke();
+  }
+  if (o.specks) { ctx.fillStyle = o.c || '#8ff5e6'; for (let i = 0; i < o.specks; i++) { const a = R.r(0, TAU), d = r * R.r(0.2, 1.4); ctx.fillRect(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 2, 2); } }
+  ctx.restore();
+}
+// radial tick burst (warm world impact)
+function burst(cx, cy, r0, r1, o = {}) {
+  const R = RNG('bur', o.key ?? 'b', B), n = o.n ?? 12;
+  ctx.save(); ctx.strokeStyle = o.c || C.ink; ctx.lineWidth = o.w ?? 3; ctx.lineCap = 'round'; ctx.globalAlpha = o.al ?? 1; ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const a = i / n * TAU + R.n(0.15) + (o.rot ?? 0), a1 = r0 * R.r(0.85, 1.1), b1 = r1 * R.r(0.75, 1.15);
+    ctx.moveTo(cx + Math.cos(a) * a1, cy + Math.sin(a) * a1); ctx.lineTo(cx + Math.cos(a) * b1, cy + Math.sin(a) * b1);
+  }
+  ctx.stroke(); ctx.restore();
+}
+function star4(x, y, s, c) {
+  ctx.save(); ctx.fillStyle = c; ctx.beginPath();
+  ctx.moveTo(x, y - s); ctx.quadraticCurveTo(x, y, x + s, y); ctx.quadraticCurveTo(x, y, x, y + s);
+  ctx.quadraticCurveTo(x, y, x - s, y); ctx.quadraticCurveTo(x, y, x, y - s); ctx.fill(); ctx.restore();
+}
+// rainbow contour strokes around a moving part
+function rainbow(P, o = {}) {
+  const bb = bbox(P), cx = o.cx ?? (bb.x0 + bb.x1) / 2, cy = o.cy ?? (bb.y0 + bb.y1) / 2, n = o.n ?? 3;
+  for (let i = 0; i < n; i++) {
+    const S = RNG('rb', o.key, i, B), sc = 1 + (o.spread ?? 0.07) * (i + 1) + S.n(0.02);
+    const Q = P.map(([x, y]) => [cx + (x - cx) * sc + S.n(o.drift ?? 3), cy + (y - cy) * sc + S.n(o.drift ?? 3)]);
+    ink(Q, { closed: o.closed ?? true, color: RAINBOW[(i + (o.off ?? 0)) % RAINBOW.length], w: o.w ?? 1.6, amt: o.amt ?? 3.5, key: o.key + 'rb' + i, alpha: o.al ?? 0.85 });
+  }
+}
+// hex cell grid inside current clip
+function hexGrid(bb, size, o = {}) {
+  const h = size * Math.sqrt(3), R = RNG('hex', o.key ?? 'h', B);
+  ctx.save(); ctx.strokeStyle = o.c || C.periS; ctx.lineWidth = o.w ?? 1.2; ctx.globalAlpha = o.al ?? 1; ctx.beginPath();
+  let row = 0;
+  for (let y = bb.y0 - h; y < bb.y1 + h; y += h * 0.5, row++) {
+    for (let x = bb.x0 - size * 3 + (row % 2) * size * 1.5; x < bb.x1 + size * 3; x += size * 3) {
+      const jx = R.n(0.6), jy = R.n(0.6);
+      for (let k = 0; k < 6; k++) {
+        const a = k / 6 * TAU, b = (k + 1) / 6 * TAU;
+        if (k === 0) ctx.moveTo(x + Math.cos(a) * size + jx, y + Math.sin(a) * size + jy);
+        ctx.lineTo(x + Math.cos(b) * size + jx, y + Math.sin(b) * size + jy);
+      }
+    }
+  }
+  ctx.stroke(); ctx.restore();
+}
+
+// ---------------------------------------------------------------------
+//  iris, camera, text
+// ---------------------------------------------------------------------
+// ragged hatched rim; dir=+1 strokes reach outward, -1 inward
+function irisRim(cx, cy, r, dir, o = {}) {
+  const R = RNG('irisR', o.key ?? 'i', B), n = Math.min(1600, Math.floor(r * TAU / 2.0));
+  ctx.strokeStyle = o.c || '#0b0c17'; ctx.lineWidth = o.w ?? 1.6; ctx.lineCap = 'round'; ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const a = R.r(0, TAU), L = R.r(3, 11) + (R.f() < 0.28 ? R.r(10, 34) : 0), sl = R.n(0.4);
+    const r0 = r - dir * R.r(2, 6), r1 = r + dir * L, ax = Math.cos(a), ay = Math.sin(a);
+    ctx.moveTo(cx + ax * r0, cy + ay * r0); ctx.lineTo(cx + ax * r1 - ay * L * sl, cy + ay * r1 + ax * L * sl);
+  }
+  ctx.stroke();
+}
+// iris into a black hole (screen space)
+function irisHole(cx, cy, r, o = {}) {
+  if (r <= 0.5) return;
+  ctx.save(); screen();
+  const col = o.c || '#0b0c17';
+  const P = wobble(ellipsePts(cx, cy, r, r, 0, 140), true, Math.min(4, 0.6 + r * 0.02), 'ih' + (o.key ?? ''), 9);
+  trace(P, true); ctx.fillStyle = col; ctx.fill();
+  irisRim(cx, cy, r, +1, { c: col, key: o.key });
+  if (o.inner) { ctx.save(); trace(P, true); ctx.clip(); o.inner(r); ctx.restore(); }
+  ctx.restore();
+}
+// world point (cx,cy) lands at screen centre
+function camera(cx, cy, zoom = 1, rot = 0, sx = 0, sy = 0) {
+  const c = Math.cos(rot) * zoom, s = Math.sin(rot) * zoom;
+  ctx.setTransform(c, s, -s, c, W / 2 + sx - (c * cx - s * cy), H / 2 + sy - (s * cx + c * cy));
+}
+function screen() { ctx.setTransform(1, 0, 0, 1, 0, 0); }
+function toScreen(x, y) { const p = ctx.getTransform().transformPoint(new DOMPoint(x, y)); return [p.x, p.y]; }
+function fillAll(color) { ctx.save(); screen(); ctx.fillStyle = color; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+
+// monospace text with per-glyph hand jitter
+function monoText(str, x, y, size, color, o = {}) {
+  ctx.save();
+  ctx.font = `${o.weight ?? 700} ${size}px ${MONO}`; ctx.fillStyle = color; ctx.textBaseline = 'alphabetic';
+  const cw = ctx.measureText('M').width, R = RNG('txt', o.key ?? str, B), jit = o.jit ?? 0.9;
+  const n = Math.min(o.count ?? str.length, str.length);
+  ctx.globalAlpha = o.al ?? 1;
+  for (let i = 0; i < n; i++) {
+    const ch = str[i]; if (ch === ' ') continue;
+    ctx.save(); ctx.translate(x + i * cw + R.n(jit), y + R.n(jit)); ctx.rotate(R.n(0.045)); ctx.fillText(ch, 0, 0); ctx.restore();
+  }
+  ctx.restore();
+  return cw;
+}
+function monoW(size) { ctx.save(); ctx.font = `700 ${size}px ${MONO}`; const w = ctx.measureText('M').width; ctx.restore(); return w; }
+
+// single-stroke hand lettering (x-height 0.5, ascender 1.0, baseline 0)
+const GLYPHS = {
+  ' ': { w: 0.26, s: [] },
+  c: { w: 0.5, s: [arcPts(0.26, -0.25, 0.25, -35 * DEG, -322 * DEG, 22)] },
+  o: { w: 0.52, s: [arcPts(0.26, -0.25, 0.25, -95 * DEG, -460 * DEG, 30)] },
+  a: { w: 0.54, s: [[...arcPts(0.25, -0.25, 0.235, -28 * DEG, -335 * DEG, 24)], [[0.49, -0.5], [0.49, -0.05], [0.55, 0.0]]] },
+  d: { w: 0.56, s: [[...arcPts(0.25, -0.25, 0.235, -28 * DEG, -335 * DEG, 24)], [[0.49, -1.0], [0.49, -0.05], [0.56, 0.0]]] },
+  l: { w: 0.24, s: [[[0.08, -1.0], [0.08, -0.1], [0.12, -0.01], [0.2, 0.0]]] },
+  u: { w: 0.54, s: [[[0.03, -0.5], [0.03, -0.22], ...arcPts(0.255, -0.22, 0.225, 180 * DEG, 0, 14), [0.48, -0.5]], [[0.48, -0.5], [0.48, -0.04], [0.54, 0.0]]] },
+  e: { w: 0.52, s: [[[0.03, -0.26], [0.5, -0.26], ...arcPts(0.265, -0.25, 0.245, -4 * DEG, -318 * DEG, 26)]] },
+};
+function handwrite(str, x, y, size, o = {}) {
+  const strokes = []; let pen = 0;
+  for (const ch of str) {
+    const g = GLYPHS[ch] || GLYPHS[' '];
+    for (const s of g.s) strokes.push(s.map(([u, v]) => [x + (pen + u) * size, y + v * size]));
+    pen += g.w + 0.1;
+  }
+  const lens = strokes.map(pathLen), total = lens.reduce((a, b) => a + b, 0);
+  let budget = clamp(o.frac ?? 1) * total;
+  for (let i = 0; i < strokes.length && budget > 0; i++) {
+    const f = Math.min(1, budget / lens[i]); budget -= lens[i];
+    if (o.glow) ink(strokes[i], { color: o.glow, w: (o.w ?? size * 0.06) * 3, amt: o.amt ?? 1.0, key: 'hw' + i + str, frac: f });
+    ink(strokes[i], { color: o.c, w: o.w ?? size * 0.06, amt: o.amt ?? 1.0, key: 'hw' + i + str, frac: f });
+  }
+  return pen * size;
+}
+
+// =====================================================================
+// ---- small props and helpers
+function drawPencil(tx, ty, ang, len, k = 1, key = 'pencil') {
+  ctx.save(); ctx.translate(tx, ty); ctx.rotate(ang); ctx.scale(k, k);
+  paint([[46, -16], [len, -16], [len, 16], [46, 16]], {
+    fill: C.yellow, key: key + 'b', w: 3,
+    tex: [{ k: 'hatch', a: 0.05, gap: 5, c: '#a8741d', al: 0.55, w: 1.1, dash: [20, 90], dens: (x, y) => (y > 5 ? 1 : 0.08) }, { k: 'pencil', c: '#fff1b8', al: 0.5, a: 0.05, len: 30, per: 120, dens: (x, y) => (y < -4 ? 1 : 0.1) }],
+  });
+  ink([[50, -5], [len, -5]], { w: 1.6, key: key + 'f1', alpha: 0.7 });
+  ink([[50, 6], [len, 6]], { w: 1.6, key: key + 'f2', alpha: 0.7 });
+  paint([[1, 0], [46, -15], [46, 15]], { fill: '#efcf9f', key: key + 'c', w: 2.6, tex: [{ k: 'hatch', a: 1.2, gap: 4, al: 0.35, dens: (x, y) => (y > 2 ? 1 : 0.1) }] });
+  paint([[0, 0], [15, -5], [15, 5]], { fill: '#3b3438', key: key + 't', w: 2 });
+  paint([[len, -17], [len + 26, -17], [len + 26, 17], [len, 17]], { fill: '#bcb7ab', key: key + 'fe', w: 2.6, tex: [{ k: 'hatch', a: Math.PI / 2, gap: 5, al: 0.5 }] });
+  paint(rrectPts(len + 24, -16, 34, 32, 10), { fill: '#e58f8c', key: key + 'e', w: 2.6, tex: [{ k: 'pencil', c: C.roseD, al: 0.5, per: 60 }] });
+  ctx.restore();
+}
+// smoothstep of x between a and b (NOT manim's `smooth` rate function — the math style calls that smoothM)
+const smooth = (a, b, x) => { const u = clamp((x - a) / (b - a)); return u * u * (3 - 2 * u); };
+const mod = (a, n) => ((a % n) + n) % n;
+function asterisk(x, y, r0, r1, n, rot, color, w) {
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath();
+  for (let i = 0; i < n; i++) { const a = i / n * TAU + rot; ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); }
+  ctx.stroke(); ctx.restore();
+}
+
+// ---------------------------------------------------------------------
+//  time (set by the renderer): TT = absolute time on the motion step (on 2s unless STYLE.ones);
+//  E0 = the current era's start; DEFER = overlay queue (captions drawn after the camera); SPARK_AT = the hero's screen spot
+//  ev(t, d) = 0..1 progress of an event at t over d seconds; popS(t) = back-eased pop-in scale
+// ---------------------------------------------------------------------
+let TT = 0, E0 = 0, DEFER = null, SPARK_AT = null;
+const ev = (t, d = 0.25) => clamp((TT - t) / d);
+const popS = (t) => (TT < t ? 0 : EZ.back(clamp((TT - t) / 0.25)));
+
+// ---------------------------------------------------------------------
+//  springs: closed-form, so any frame can be drawn on its own (deterministic, no state)
+//  springEase(t, k, d)       0 -> 1 over time t >= 0 (stiffness k, damping d): accelerates, overshoots a hair, settles
+//  springMove(t0, a, b, p)   a value moving from a to b, starting at time t0 (p = a SPRING preset)
+//  springTrack(keys, p)      a value with many targets: keys = [[t, value], ...] sorted by t. One spring per change,
+//                            added up, so a target change mid-move stays continuous (cursors, widths, positions)
+// ---------------------------------------------------------------------
+const SPRING = {
+  snappy: { k: 320, d: 30 },    // UI: buttons, toggles, leading edges
+  smooth: { k: 170, d: 26 },    // cards, containers, the camera
+  heavy: { k: 90, d: 19 },      // big type, logos, large objects
+  playful: { k: 260, d: 14 },   // mascots, stickers: visible overshoot
+};
+function springEase(t, k = 170, d = 26) {
+  if (t <= 0) return 0;
+  const w0 = Math.sqrt(k), z = d / (2 * w0);
+  if (z < 1) { const wd = w0 * Math.sqrt(1 - z * z); return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t)); }
+  return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+}
+const springMove = (t0, a, b, p = SPRING.smooth) => a + (b - a) * springEase(TT - t0, p.k, p.d);
+function springTrack(keys, p = SPRING.smooth) {
+  let v = keys[0][1];
+  for (let i = 1; i < keys.length; i++) v += (keys[i][1] - keys[i - 1][1]) * springEase(TT - keys[i][0], p.k, p.d);
+  return v;
+}
+
+// ---------------------------------------------------------------------
+//  layout for several formats (9:16, 1:1, 16:9, 4:5 from one piece): place things by fractions of the frame,
+//  size them by UNIT (1 at 1080 on the short side). LX(0.5), LY(0.62), 120 * UNIT. PORTRAIT / WIDE pick layouts.
+// ---------------------------------------------------------------------
+const LX = (f) => f * W, LY = (f) => f * H, UNIT = Math.min(W, H) / 1080, PORTRAIT = H > W * 1.2, WIDE = W > H * 1.2;
+
+// ---------------------------------------------------------------------
+//  the user's own assets (screenshots, logos): files in <piece>/assets/ that tools/build.mjs embeds in the page.
+//  asset('logo.png') -> the Image (or null); drawAsset(name, x, y, w, h, { fit: 'contain'|'cover', r, alpha })
+//  Real product UI only: never redraw a product screen from imagination when a screenshot exists.
+// ---------------------------------------------------------------------
+const asset = (name) => (typeof ASSETS !== 'undefined' && ASSETS[name] && ASSETS[name].complete ? ASSETS[name] : null);
+function drawAsset(name, x, y, w, h, o = {}) {
+  const img = asset(name); if (!img) return false;
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const s = (o.fit === 'cover' ? Math.max : Math.min)(w / iw, h / ih), dw = iw * s, dh = ih * s;
+  ctx.save(); ctx.globalAlpha *= o.alpha ?? 1;
+  if (o.r || o.fit === 'cover') { ctx.beginPath(); ctx.roundRect(x, y, w, h, o.r || 0); ctx.clip(); }
+  ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  ctx.restore(); return true;
+}
+// =====================================================================
+//  styles/devakala/kit.js — Kerala mural / classical Indian mythological style
+//  Palette measured from 5 reference images (references/devakala/1-5.jpg):
+//    ref 1: bold modern Kerala-inspired (navy, red lotus, large reclining Vishnu)
+//    ref 2: true Kerala mural (warm parchment, scrollwork, blue Krishna, teardrop border)
+//    ref 3: Indian miniature (cream ground, Lakshmi with elephant, pink lotus)
+//    ref 4: modern illustration (dark teal, Vishnu with Shesha, gold ornaments)
+//    ref 5: Kerala/Rajput (ochre ground, reclining dark Vishnu, gold, curved lotus stem)
+//  No sharp edges: all shapes use ellipses or smooth petal curves. Flat fills, bold
+//  warm outlines, lotus motifs, gold halos, Kerala spiral foliage, teardrop borders.
+//  On 2s. Built on kit/core.js. Needs HAND, CX from the piece head.
+// =====================================================================
+const DK = {
+  ink:       '#1A0800',   // warm near-black outlines
+  parchment: '#F5CB6B',   // warm gold parchment (ref 2)
+  parchL:    '#FCE8B0',   // light parchment
+  parchD:    '#C49040',   // deep ochre
+  cosmic:    '#0D1E30',   // deep navy night (ref 1)
+  teal:      '#0C3240',   // forest teal (ref 4)
+
+  gold:      '#D4943A',   // ornament gold
+  goldL:     '#F0B840',   // highlight gold
+  goldD:     '#8B5A10',   // shadow gold
+
+  blue:      '#4A80B8',   // divine skin (Krishna, Vishnu — refs 2, 4)
+  blueD:     '#2A5080',   // deep divine blue
+
+  ivory:     '#F0E5C8',   // ivory / light figures
+  ivoryD:    '#D4C8A0',   // warm ivory shadow
+
+  red:       '#C03020',   // vermillion (lotus, cosmic — ref 1)
+  redL:      '#E05030',   // bright vermillion
+  redD:      '#8A1810',   // deep red (back petals)
+
+  lotus:     '#E890A0',   // pink lotus (ref 3)
+  lotusD:    '#C05070',   // deep pink lotus
+
+  green:     '#2A5C28',   // lotus stem / foliage
+  greenL:    '#4A8040',   // light foliage
+
+  saffron:   '#E07030',   // saffron garment
+  saffronL:  '#F09040',   // bright saffron
+
+  paper:     '#E8C070',   // morph paper
+};
+
+// =====================================================================
+//  Core shape: flat-fill, bold outline, gentle boil on 2s
+// =====================================================================
+function dkShape(P, c, o = {}) {
+  const key = o.key ?? 'dks';
+  const Q = o.raw ? P : wobble(P, true, o.amt ?? 0.4, key, 7);
+  ctx.save();
+  trace(Q, true);
+  ctx.fillStyle = c;
+  ctx.fill();
+  if (o.line !== false) {
+    ctx.lineWidth = o.w ?? 3;
+    ctx.strokeStyle = typeof o.line === 'string' ? o.line : DK.ink;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// =====================================================================
+//  Smooth lotus petal points — no sharp corners.
+//  tipX, tipY: petal tip  |  baseX, baseY: petal base (lotus center)
+//  pw: half-width at the widest point  |  n: point count
+// =====================================================================
+function petalPts(tipX, tipY, baseX, baseY, pw, n) {
+  n = n || 24;
+  const dx = tipX - baseX, dy = tipY - baseY;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / len, uy = dy / len;   // along axis (base→tip)
+  const nx = -uy, ny = ux;              // left normal
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / n;
+    let along, across;
+    if (t < 0.5) {
+      const u = t * 2;      // 0→1: base to tip, LEFT side
+      along = u;
+      across = -pw * Math.sin(Math.PI * u);
+    } else {
+      const u = (t - 0.5) * 2;  // 0→1: tip to base, RIGHT side
+      along = 1 - u;
+      across = pw * Math.sin(Math.PI * (1 - u));
+    }
+    pts.push([
+      baseX + ux * len * along + nx * across,
+      baseY + uy * len * along + ny * across,
+    ]);
+  }
+  return pts;
+}
+
+// =====================================================================
+//  Lotus — the style's signature motif (redesigned with petalPts)
+//  Petals radiate from (x,y); r = tip-radius; open: 0=bud, 1=bloom
+// =====================================================================
+function dkLotus(x, y, r, o = {}) {
+  const key  = o.key  ?? 'lot';
+  const n    = o.n    ?? 8;
+  const c    = o.c    ?? DK.lotus;
+  const ci   = o.ci  ?? DK.lotusD;
+  const open = clamp(o.open ?? 1);
+
+  if (open < 0.08) {
+    // Closed bud: one upright petal cluster
+    dkShape(petalPts(x, y - r * 0.55, x, y + r * 0.1, r * 0.18, 20), c, { key: key + 'bud', w: 3, amt: 0.25 });
+    dkShape(ellipsePts(x, y + r * 0.22, r * 0.2, r * 0.14, 0, 18), DK.green, { key: key + 'sep', w: 2 });
+    return;
+  }
+
+  const pw = r * 0.56;
+
+  // Back layer (offset half-step, slightly shorter, darker)
+  for (let i = 0; i < n; i++) {
+    const a = (i / n + 0.5 / n) * TAU;
+    const cr = r * (0.8 + 0.2 * open);
+    const pts = petalPts(x + Math.cos(a) * cr, y + Math.sin(a) * cr, x, y, pw * 0.85, 22);
+    dkShape(pts, ci, { key: key + 'bk' + i, amt: 0.22, w: 3.5 });
+  }
+
+  // Front layer
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    const cr = r * (0.85 + 0.15 * open);
+    const pts = petalPts(x + Math.cos(a) * cr, y + Math.sin(a) * cr, x, y, pw, 22);
+    dkShape(pts, c, { key: key + 'ft' + i, amt: 0.25, w: 3.5 });
+    // Inner vein highlight
+    const veinTipX = x + Math.cos(a) * cr * 0.7;
+    const veinTipY = y + Math.sin(a) * cr * 0.7;
+    const veinPts = petalPts(veinTipX, veinTipY, x + Math.cos(a) * cr * 0.1, y + Math.sin(a) * cr * 0.1, pw * 0.28, 14);
+    dkShape(veinPts, ci, { key: key + 've' + i, amt: 0.18, w: 0, line: false });
+  }
+
+  // Sepal ring (green calyx)
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * TAU;
+    dkShape(ellipsePts(x + Math.cos(a) * r * 0.14, y + Math.sin(a) * r * 0.14, r * 0.09, r * 0.18, a, 14),
+      DK.green, { key: key + 'sp' + i, amt: 0.22, w: 2 });
+  }
+
+  // Gold centre disc
+  dkShape(ellipsePts(x, y, r * 0.2, r * 0.2, 0, 28), DK.goldL, { key: key + 'ctr', w: 2.5, line: DK.goldD, amt: 0.12 });
+  // Stamen dots
+  const Rs = RNG('lot', key);
+  ctx.fillStyle = DK.goldD;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU, dr = r * Rs.r(0.04, 0.12);
+    ctx.beginPath(); ctx.arc(x + Math.cos(a) * dr, y + Math.sin(a) * dr, 3.5, 0, TAU); ctx.fill();
+  }
+}
+
+// =====================================================================
+//  Halo — circular gold mandala
+// =====================================================================
+function dkHalo(x, y, r, key) {
+  key = key ?? 'halo';
+  dkShape(ellipsePts(x, y, r, r, 0, 56), DK.gold, { key: key + 'o', amt: 0.15, w: 6, line: DK.goldD });
+  dkShape(ellipsePts(x, y, r * 0.84, r * 0.84, 0, 56), DK.goldL, { key: key + 'i', amt: 0.08, line: false });
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * TAU;
+    ctx.fillStyle = i % 3 === 0 ? DK.goldD : DK.gold;
+    ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * 0.92, y + Math.sin(a) * r * 0.92,
+      i % 3 === 0 ? 5.5 : 3.5, 0, TAU); ctx.fill();
+  }
+  ctx.strokeStyle = DK.goldD; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * r * 0.22, y + Math.sin(a) * r * 0.22);
+    ctx.lineTo(x + Math.cos(a) * r * 0.78, y + Math.sin(a) * r * 0.78);
+    ctx.stroke();
+  }
+}
+
+// =====================================================================
+//  Kerala spiral coil — smooth logarithmic spiral (no sharp corners)
+// =====================================================================
+function dkCoil(x, y, r, key) {
+  key = key ?? 'coil';
+  const P = [], nPts = 70, turns = 2.5;
+  for (let i = 0; i <= nPts; i++) {
+    const t = i / nPts, a = t * TAU * turns - Math.PI / 2;
+    const rad = r * (0.05 + 0.95 * t);
+    P.push([x + Math.cos(a) * rad, y + Math.sin(a) * rad]);
+  }
+  ink(P, { w: Math.max(3.5, r * 0.08), color: DK.green, key, amt: 0.45 });
+  // Leaf at outer end
+  dkShape(petalPts(x + r * 0.1, y - r * 0.95, x, y - r * 0.52, r * 0.22, 16),
+    DK.greenL, { key: key + 'lf', w: 2.5, amt: 0.35 });
+}
+
+// =====================================================================
+//  Scroll cloud — three rounded lobes (Kerala style, no sharp edges)
+// =====================================================================
+function dkCloud(x, y, s, key) {
+  key = key ?? 'cld';
+  // Main body
+  dkShape(ellipsePts(x, y, s * 0.85, s * 0.38, 0, 32), DK.ivory, { key: key + 'b', amt: 0.35, w: 2.5 });
+  // Left lobe
+  dkShape(ellipsePts(x - s * 0.65, y + s * 0.08, s * 0.34, s * 0.26, -0.25, 26), DK.ivory, { key: key + 'l', amt: 0.30, w: 2.5 });
+  // Right lobe
+  dkShape(ellipsePts(x + s * 0.65, y + s * 0.08, s * 0.34, s * 0.26, 0.25, 26), DK.ivory, { key: key + 'r', amt: 0.30, w: 2.5 });
+  // Top small bump
+  dkShape(ellipsePts(x, y - s * 0.22, s * 0.42, s * 0.24, 0, 22), DK.ivory, { key: key + 't', amt: 0.28, w: 2 });
+}
+
+// =====================================================================
+//  Teardrop border strip — top/bottom decorative band (ref 2)
+// =====================================================================
+function dkBorder(y0, h, c1, c2, key) {
+  key = key ?? 'bdr';
+  dkShape(rrectPts(-20, y0, W + 40, h, 0), c1, { key: key + 'bg', raw: true, line: false });
+  const n = Math.floor(W / (h * 0.82)) + 1, gap = W / n;
+  for (let i = 0; i < n; i++) {
+    const cx = i * gap + gap / 2, cy = y0 + h / 2;
+    const rx = gap * 0.30, ry = h * 0.42;
+    const P = [];
+    for (let j = 0; j <= 30; j++) {
+      const t = j / 30, a = t * TAU - Math.PI / 2;
+      const taper = t < 0.5 ? 1 - t * 0.45 : 1;
+      P.push([cx + Math.cos(a) * rx * taper, cy + Math.sin(a) * ry]);
+    }
+    dkShape(P, c2, { key: key + 't' + i, amt: 0.18, w: 1.8 });
+  }
+}
+
+// =====================================================================
+//  Caption + year tag (drawn after camera via DEFER)
+// =====================================================================
+function dkCaption(str) {
+  const f = () => {
+    const size = 52;
+    ctx.save(); ctx.font = `500 ${size}px ${HAND}`;
+    const tw = ctx.measureText(str).width;
+    ctx.restore();
+    const pad = 28, bw = tw + pad * 2, bh = size * 1.5;
+    const x0 = CX - bw / 2, y0 = H - SAFE.bottom - 90;
+    dkShape(rrectPts(x0, y0, bw, bh, 10), DK.parchL, { key: 'cap' + str, raw: true, w: 2.5, line: DK.goldD });
+    ctx.save(); ctx.font = `500 ${size}px ${HAND}`; ctx.fillStyle = DK.ink;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const fr = ev(E0 + 0.4, 0.5);
+    if (fr < 1) { ctx.beginPath(); ctx.rect(x0, y0, bw * fr, bh); ctx.clip(); }
+    ctx.fillText(str, CX, y0 + bh / 2);
+    ctx.restore();
+  };
+  if (DEFER) DEFER.push(f); else f();
+}
+
+function dkYearTag(str) {
+  const f = () => {
+    const size = 68;
+    ctx.save(); ctx.font = `600 ${size}px ${HAND}`;
+    const tw = ctx.measureText(str).width;
+    ctx.restore();
+    const pad = 24, bw = tw + pad * 2 + 60, bh = size * 1.45;
+    const x0 = 56, y0 = SAFE.top + 56;
+    dkShape(rrectPts(x0, y0, bw, bh, 10), DK.parchL, { key: 'yt' + str, raw: true, w: 3, line: DK.gold });
+    dkLotus(x0 + bw + 34, y0 + bh / 2, 22, { key: 'ytl' + str, n: 5, open: popS(E0 + 0.1), c: DK.red, ci: DK.redL });
+    ctx.save(); ctx.font = `600 ${size}px ${HAND}`; ctx.fillStyle = DK.ink;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(str, x0 + pad, y0 + bh / 2);
+    ctx.restore();
+  };
+  if (DEFER) DEFER.push(f); else f();
+}
+
+// =====================================================================
+//  Hero — blooming lotus with gentle idle bob; sets SPARK_AT
+// =====================================================================
+function dkHero(x, y, r, o) {
+  o = o ?? {};
+  y += Math.sin(TT * TAU * 0.7 + ((o.key ?? 'h').length)) * r * 0.05;
+  SPARK_AT = toScreen(x, y);
+  if (o.stem !== false) {
+    const P = [[x, y + r * 0.9], [x - r * 0.12, y + r * 1.55], [x + r * 0.06, y + r * 2.3]];
+    ink(P, { w: Math.max(4, r * 0.09), color: DK.green, key: (o.key ?? 'h') + 'st' });
+  }
+  dkLotus(x, y, r, { key: o.key ?? 'hero', open: o.open ?? 1, c: o.c ?? DK.red, ci: o.ci ?? DK.redL });
+  if ((o.open ?? 1) > 0.5) {
+    ctx.save();
+    ctx.globalAlpha = ((o.open ?? 1) - 0.5) * 0.15;
+    dkShape(ellipsePts(x, y, r * 1.35, r * 1.35, 0, 36), DK.goldL, { key: (o.key ?? 'h') + 'aur', line: false, raw: true });
+    ctx.restore();
+  }
+}
+
+// =====================================================================
+//  STYLE hooks (kit/morph.js contract)
+// =====================================================================
+const STYLE = {
+  name: 'devakala',
+  paper: DK.paper,
+
+  backdrop(c) {
+    ctx.fillStyle = c;
+    ctx.fillRect(0, 0, W, H);
+  },
+
+  window(P, key, src) {
+    ctx.save(); trace(P, true); ctx.clip(); ctx.drawImage(src, 0, 0); ctx.restore();
+    ctx.save(); trace(P, true); ctx.lineWidth = 9; ctx.strokeStyle = DK.gold; ctx.lineJoin = 'round'; ctx.stroke(); ctx.restore();
+    ctx.save(); trace(P, true); ctx.lineWidth = 3.5; ctx.strokeStyle = DK.goldD; ctx.lineJoin = 'round'; ctx.stroke(); ctx.restore();
+  },
+
+  blob(P, c, key) { dkShape(P, c, { key, amt: 0.45 }); },
+
+  hero(x, y, r, o) { dkHero(x, y, r * 0.65, { ...(o ?? {}), stem: false }); },
+  heroColor: DK.red,
+
+  post() {},
+
+  ones: false,
+};
+
+// =====================================================================
+//  SCENES — one function per era, world coordinates 1080×1920.
+//  Ref 1 structure (cosmic): large lotus dominates upper third, reclining
+//    Vishnu head below, bottom petal row as Shesha's couch.
+//  Ref 2 structure (garden): parchment mural with spiral scrollwork, blue
+//    deity centered, halo, teardrop border.
+//  All shapes use ellipses or petalPts — no rectangles or sharp corners.
+// =====================================================================
+
+// ── Era 1: Cosmic night — Shesha's dream ───────────────────────────
+function sceneCosmic() {
+  // 1. Full-bleed deep navy ground
+  ctx.fillStyle = DK.cosmic;
+  ctx.fillRect(0, 0, W, H);
+
+  // 2. Subtle stars (upper two-thirds of frame)
+  const RS = RNG('stars');
+  ctx.fillStyle = 'rgba(240,230,200,0.55)';
+  for (let i = 0; i < 70; i++) {
+    const sx = RS.r(0, W), sy = RS.r(0, H * 0.6);
+    const sr = RS.r(1.5, 3) * (0.7 + 0.3 * (B % 3 === i % 3 ? 1 : 0.6));
+    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, TAU); ctx.fill();
+  }
+
+  // 3. Cosmic bridge disc (behind lotus, centred upper third) — morph bridge object
+  dkShape(ellipsePts(540, 480, 162, 162, 0, 56), DK.ivory, { key: 'disc', amt: 0.18, w: 6, line: DK.gold });
+  dkShape(ellipsePts(540, 480, 132, 132, 0, 48), DK.parchL, { key: 'disci', amt: 0.12, w: 2, line: DK.goldD });
+
+  // 4. Large lotus — the hero, centred at disc position (lotus ≈ 40% of frame width)
+  const heroOpen = ev(TIMELINE.cues.lotusRise, 1.2);
+  dkHero(540, 480, 210, { key: 'hero', open: heroOpen, stem: false, c: DK.red, ci: DK.redL });
+
+  // 5. Two scroll clouds flanking the lotus
+  dkCloud(195, 430, 130, 'cldL');
+  dkCloud(885, 430, 130, 'cldR');
+
+  // 6. Thick curved lotus stem — connects lotus base to the reclining figure's navel
+  const stemPts = [
+    [540, 690],
+    [520, 820],
+    [500, 960],
+    [480, 1110],
+    [465, 1210],
+  ];
+  ink(stemPts, { w: 26, color: DK.green, key: 'stem' });
+  ink(stemPts, { w: 13, color: DK.greenL, key: 'stemL' });
+  // Two leaves off the stem
+  dkShape(petalPts(410, 880, 505, 930, 85, 18), DK.green, { key: 'leaf1', w: 3.5, amt: 0.38 });
+  dkShape(petalPts(540, 1060, 480, 1000, 65, 16), DK.green, { key: 'leaf2', w: 3, amt: 0.35 });
+
+  // 7. Shesha's coils — smooth overlapping ivory oval bands behind the divine body
+  const coilY = 1340;
+  for (let i = 0; i < 5; i++) {
+    const cx = 520 + (i - 2) * 190;
+    const cy = coilY + i * 16;
+    dkShape(ellipsePts(cx, cy, 270 - i * 18, 68 - i * 6, 0, 36),
+      i % 2 === 0 ? '#E0D8C0' : '#D4CCB0', { key: 'coil' + i, w: 4, amt: 0.22 });
+    // Gold ring on each coil
+    dkShape(ellipsePts(cx + 55, cy - 18, 30, 16, 0.3, 20),
+      DK.gold, { key: 'cring' + i, w: 2.5, line: DK.goldD, amt: 0.18 });
+  }
+
+  // 8. Reclining divine body — smooth horizontal ellipse (no rectangles)
+  dkShape(ellipsePts(570, 1250, 490, 88, 0, 48), DK.blue, { key: 'body', w: 5, amt: 0.28 });
+  // Saffron garment — oval over the mid/lower torso
+  dkShape(ellipsePts(630, 1260, 325, 55, 0.12, 36), DK.saffron, { key: 'garment', w: 3, amt: 0.22 });
+  // Gold waistband
+  dkShape(ellipsePts(570, 1235, 490, 22, 0, 36), DK.gold, { key: 'waist', w: 2.5, line: DK.goldD, amt: 0.18 });
+  // Gold ankle ornament at far right
+  dkShape(ellipsePts(968, 1252, 36, 22, 0.2, 22), DK.gold, { key: 'ankl', w: 2.5, line: DK.goldD, amt: 0.18 });
+
+  // 9. Reclining divine head — large smooth oval, head at LEFT end
+  // Neck connection
+  dkShape(ellipsePts(270, 1195, 48, 62, 0, 24), DK.blue, { key: 'neck', w: 4, amt: 0.25 });
+  // Head (ivory-toned divine face, reading reclined to the right)
+  dkShape(ellipsePts(195, 1095, 152, 178, 0, 48), DK.blue, { key: 'head', w: 5, amt: 0.25 });
+  // Face highlight (lighter inner glow on face centre)
+  dkShape(ellipsePts(180, 1075, 90, 110, 0, 32), DK.blueD, { key: 'headhi', w: 0, line: false, amt: 0.18 });
+  // Tilaka (the forehead mark — a small vertical ellipse)
+  dkShape(ellipsePts(160, 1025, 10, 16, 0, 14), DK.gold, { key: 'tika', w: 0, raw: true, line: false });
+  // Eye — almond-shaped, closed (reclining/sleeping)
+  dkShape(ellipsePts(148, 1060, 48, 17, 0, 24), DK.ink, { key: 'eye', w: 0, raw: true, line: false });
+  // Eye lower lid curve
+  {
+    const lidPts = [];
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12;
+      lidPts.push([100 + t * 96, 1068 + Math.sin(Math.PI * t) * 10]);
+    }
+    ink(lidPts, { w: 4, color: DK.ink, key: 'lid' });
+  }
+  // Eyebrow — curved arc
+  {
+    const browPts = [];
+    for (let i = 0; i <= 12; i++) {
+      const t = (i / 12) - 0.5;
+      browPts.push([148 + t * 95, 1032 - Math.cos(t * Math.PI * 0.85) * 20]);
+    }
+    ink(browPts, { w: 6, color: DK.ink, key: 'brow' });
+  }
+  // Nose — small oval bump
+  dkShape(ellipsePts(120, 1092, 11, 16, 0, 16), DK.ink, { key: 'nose', w: 0, raw: true, line: false });
+  // Ear
+  dkShape(ellipsePts(245, 1100, 20, 34, 0, 20), DK.blueD, { key: 'ear', w: 3, amt: 0.2 });
+  // Gold earring
+  dkShape(ellipsePts(245, 1125, 16, 22, 0, 18), DK.gold, { key: 'earing', w: 2, line: DK.goldD, amt: 0.15 });
+
+  // 10. Crown / kirita — tall smooth tapering shape (no triangle, uses petalPts)
+  dkShape(petalPts(195, 890, 195, 1000, 125, 28), DK.gold, { key: 'crown', w: 4, amt: 0.28 });
+  dkShape(petalPts(195, 920, 195, 998, 82, 24), DK.goldL, { key: 'crownL', w: 2, amt: 0.2, line: DK.goldD });
+  // Crown jewel
+  dkShape(ellipsePts(195, 906, 16, 22, 0, 16), DK.red, { key: 'jewel', w: 2, line: DK.goldD, amt: 0.15 });
+
+  // 11. Necklace on the figure
+  dkShape(ellipsePts(250, 1162, 72, 22, -0.28, 28), DK.gold, { key: 'nkl', w: 3, amt: 0.18, line: DK.goldD });
+
+  // 12. Two Kerala spiral coils at lower corners — foliage life detail
+  dkCoil(82, 1570, 82, 'coilBL');
+  dkCoil(998, 1570, 82, 'coilBR');
+
+  // 13. Bottom petal row — the great lotus couch (Ananta/Shesha's lotus bed)
+  //     Large red petals pointing up from the very bottom of the frame
+  for (let i = 0; i < 9; i++) {
+    const px = 36 + i * 114;
+    // Outer petal (dark)
+    dkShape(petalPts(px, 1610, px, 1970, 102, 22), DK.redD, { key: 'bp' + i, w: 4, amt: 0.32 });
+    // Inner petal highlight
+    dkShape(petalPts(px, 1640, px, 1940, 64, 18), DK.red, { key: 'bpL' + i, w: 2, amt: 0.25 });
+  }
+
+  dkYearTag('cosmic');
+  dkCaption('Shesha\'s dream');
+}
+
+// ── Era 2: Parchment day — the garden ──────────────────────────────
+function sceneGarden() {
+  // 1. Full-bleed warm parchment ground
+  ctx.fillStyle = DK.parchment;
+  ctx.fillRect(0, 0, W, H);
+
+  // 2. Teardrop border strips top and bottom
+  dkBorder(0, 95, DK.parchD, DK.gold, 'bdrT');
+  dkBorder(H - 95, 95, DK.parchD, DK.gold, 'bdrB');
+
+  // 3. Spiral scrollwork background (Kerala ref 2 — green curling vines)
+  dkCoil(75, 230, 100, 'coilTL');
+  dkCoil(1005, 230, 100, 'coilTR');
+  dkCoil(52, 820, 72, 'coilML');
+  dkCoil(1028, 820, 72, 'coilMR');
+  // Extra small coils weaving around the composition
+  dkCoil(110, 550, 55, 'coilSL');
+  dkCoil(970, 550, 55, 'coilSR');
+  dkCoil(75, 1740, 90, 'coilBL');
+  dkCoil(1005, 1740, 90, 'coilBR');
+
+  // 4. The halo — the bridge object (gold mandorla, centred upper third)
+  dkHalo(540, 480, 202, 'halo');
+
+  // 5. Two scroll clouds framing the deity's head
+  dkCloud(162, 740, 115, 'cldGL');
+  dkCloud(918, 740, 115, 'cldGR');
+
+  // 6. Deity — standing figure (all smooth ovals, no rectangles)
+
+  // Head — blue oval
+  dkShape(ellipsePts(540, 455, 90, 108, 0, 48), DK.blue, { key: 'dhead', w: 5, amt: 0.25 });
+  // Face highlight
+  dkShape(ellipsePts(530, 445, 54, 68, 0, 32), DK.blueD, { key: 'dheadhi', w: 0, line: false, amt: 0.15 });
+  // Tilaka
+  dkShape(ellipsePts(520, 415, 10, 16, 0, 14), DK.red, { key: 'dtika', w: 0, raw: true, line: false });
+  // Right eye
+  dkShape(ellipsePts(510, 440, 28, 12, -0.15, 20), DK.ink, { key: 'deye', w: 0, raw: true, line: false });
+  // Left eye
+  dkShape(ellipsePts(568, 440, 28, 12, 0.15, 20), DK.ink, { key: 'deye2', w: 0, raw: true, line: false });
+  // Eyebrows
+  {
+    const browL = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = (i / 10) - 0.5;
+      browL.push([510 + t * 55, 426 - Math.cos(t * Math.PI * 0.85) * 12]);
+    }
+    ink(browL, { w: 5, color: DK.ink, key: 'dbrowL' });
+    const browR = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = (i / 10) - 0.5;
+      browR.push([568 + t * 55, 426 - Math.cos(t * Math.PI * 0.85) * 12]);
+    }
+    ink(browR, { w: 5, color: DK.ink, key: 'dbrowR' });
+  }
+  // Nose
+  dkShape(ellipsePts(540, 462, 10, 14, 0, 14), DK.ink, { key: 'dnose', w: 0, raw: true, line: false });
+  // Ears
+  dkShape(ellipsePts(458, 458, 18, 30, 0, 18), DK.blueD, { key: 'dearL', w: 3, amt: 0.18 });
+  dkShape(ellipsePts(622, 458, 18, 30, 0, 18), DK.blueD, { key: 'dearR', w: 3, amt: 0.18 });
+  // Gold earrings
+  dkShape(ellipsePts(458, 480, 14, 20, 0, 16), DK.gold, { key: 'dearrL', w: 2, line: DK.goldD, amt: 0.15 });
+  dkShape(ellipsePts(622, 480, 14, 20, 0, 16), DK.gold, { key: 'dearrR', w: 2, line: DK.goldD, amt: 0.15 });
+
+  // Crown (kirita) — tall tapering petal shape, no sharp triangle
+  dkShape(petalPts(540, 270, 540, 370, 145, 32), DK.gold, { key: 'dcrown', w: 4, amt: 0.28 });
+  dkShape(petalPts(540, 300, 540, 368, 95, 28), DK.goldL, { key: 'dcrownL', w: 2, line: DK.goldD, amt: 0.2 });
+  // Crown jewels
+  dkShape(ellipsePts(540, 283, 18, 25, 0, 18), DK.red, { key: 'dcjewel', w: 2, line: DK.goldD, amt: 0.15 });
+  dkShape(ellipsePts(510, 308, 11, 15, 0, 14), DK.lotus, { key: 'dcj2', w: 1.5, line: DK.goldD, amt: 0.12 });
+  dkShape(ellipsePts(570, 308, 11, 15, 0, 14), DK.lotus, { key: 'dcj3', w: 1.5, line: DK.goldD, amt: 0.12 });
+
+  // Torso — smooth blue oval (not a rectangle)
+  dkShape(ellipsePts(540, 700, 122, 208, 0, 48), DK.blue, { key: 'dtor', w: 5, amt: 0.25 });
+  // Saffron garment — oval draped over lower torso
+  dkShape(ellipsePts(540, 850, 108, 145, 0, 40), DK.saffron, { key: 'dgar', w: 3.5, amt: 0.22 });
+  // Saffron drape tails (two smooth leaf shapes hanging down)
+  dkShape(petalPts(480, 1010, 500, 875, 60, 18), DK.saffronL, { key: 'dgarL', w: 3, amt: 0.28 });
+  dkShape(petalPts(600, 1010, 580, 875, 60, 18), DK.saffronL, { key: 'dgarR', w: 3, amt: 0.28 });
+
+  // Necklace (layered gold ovals)
+  dkShape(ellipsePts(540, 572, 78, 22, 0, 28), DK.gold, { key: 'dneck1', w: 3, amt: 0.18, line: DK.goldD });
+  dkShape(ellipsePts(540, 592, 88, 22, 0, 28), DK.goldL, { key: 'dneck2', w: 2.5, amt: 0.15, line: DK.goldD });
+
+  // Two arms (smooth ovals angled out)
+  dkShape(ellipsePts(392, 615, 88, 28, -0.55, 28), DK.blue, { key: 'darmL', w: 4, amt: 0.25 });
+  dkShape(ellipsePts(688, 615, 88, 28, 0.55, 28), DK.blue, { key: 'darmR', w: 4, amt: 0.25 });
+  // Arm bangles
+  dkShape(ellipsePts(358, 628, 22, 15, -0.3, 18), DK.gold, { key: 'dbanL', w: 2.5, line: DK.goldD, amt: 0.15 });
+  dkShape(ellipsePts(722, 628, 22, 15, 0.3, 18), DK.gold, { key: 'dbanR', w: 2.5, line: DK.goldD, amt: 0.15 });
+
+  // 7. Water and lotus pond in the lower half
+  // Water surface — smooth wide oval, not a hard rectangle
+  dkShape(ellipsePts(540, 1380, 600, 240, 0, 48), '#3060A0', { key: 'water', w: 0, line: false, amt: 0.12 });
+  // Water shimmer lines
+  ctx.strokeStyle = 'rgba(160,200,255,0.28)'; ctx.lineWidth = 3;
+  const RW = RNG('water');
+  for (let i = 0; i < 8; i++) {
+    const wy = 1250 + i * 38 + RW.n(8);
+    ctx.beginPath(); ctx.moveTo(RW.r(0, 200), wy); ctx.lineTo(RW.r(800, W), wy); ctx.stroke();
+  }
+
+  // Three lotus flowers on the water — hero + two companions
+  const heroBloom = ev(TIMELINE.cues.bloom, 1.0);
+  dkHero(540, 1240, 130, { key: 'hero', open: heroBloom, stem: true, c: DK.red, ci: DK.redL });
+  dkHero(230, 1310, 78, { key: 'lotL', open: ev(TIMELINE.cues.bloom + 0.3, 0.8), stem: true, c: DK.lotus, ci: DK.lotusD });
+  dkHero(850, 1310, 78, { key: 'lotR', open: ev(TIMELINE.cues.bloom + 0.5, 0.8), stem: true, c: DK.lotus, ci: DK.lotusD });
+
+  dkYearTag('garden');
+  dkCaption('the lotus opens');
+}
+
+// =====================================================================
+//  ERAS, CAMERAS, BRIDGES
+//  The bridge: a large circular disc (the cosmic moon, top of era 1)
+//  morphs into the golden halo circle (top of era 2).
+//  Both are centred at (540, 480) — upper-third of the 9:16 frame.
+// =====================================================================
+const ERA_BG = [DK.cosmic, DK.parchment];
+function pieceCam(era, t) { return null; }
+const BRIDGES = [
+  {
+    tc: 4.0,
+    A: () => ({ P: ellipsePts(540, 480, 160, 160, 0, 64), c: DK.ivory }),    // cosmic disc
+    B: () => ({ P: ellipsePts(540, 480, 200, 200, 0, 64), c: DK.gold }),     // halo
+  },
+];
+
+// =====================================================================
+//  kit/morph.js — the renderer for pieces built from ERAS (scenes) joined by SHAPE MORPHS.
+//
+//  At each bridge time tc:
+//    shrink [tc-d, tc-m]      the old era is seen through a window shaped like the bridge object (STYLE.window),
+//                             shrinking onto the object while the backdrop fades to blank paper
+//    morph  [tc-m, tc+m]      on blank paper, the object's outline blends into its counterpart's
+//                             (both resampled by angle around their centroids; colour lerped). Hero-to-hero
+//                             bridges draw the hero itself with blended position, size and ray count.
+//    grow   [tc+m, tc+d]      the new era opens out of a window shaped like the counterpart
+//    d = the bridge's half-length (default 0.6s, so a bridge costs 1.2s), m = the morph's half (default 0.2s, or d/3 when d is set).
+//    Short pieces: { tc, d: 0.4 } (0.8s) or fewer bridges — see craft.md -> Transitions.
+//  Era boundaries WITHOUT a bridge are hard cuts (keep at most one: the slam).
+//
+//  The piece defines (in its head / src):
+//    ERA_LIST = [[t0, t1, () => drawScene()], ...]      scenes draw in world coords, call yearTag()/capStrip()
+//    ERA_BG   = ['#hex', ...]                          each era's dominant colour (for the fade to paper)
+//    BRIDGES  = [{ tc, A: () => shape, B: () => shape, d?, m? }]   shape = { P: points, c: '#hex' } or SP(x, y, r, rays)
+//    function pieceCam(era, t) { return null | CAM }   optional; use push() / bump() below
+//  Shapes are in each era's world coords; the bridge object must be in frame at tc (pull push-ins back first).
+//  The look comes from the style kit's STYLE hooks (paper, backdrop, window, blob, hero, post, ones):
+//  this file draws nothing itself, so the same piece structure works in any style.
+// =====================================================================
+// ---- cameras: CAM = { z, tx, ty }; camOf({ z, p, to }) puts world point p on screen point to
+const CAM0 = { z: 1, tx: 0, ty: 0 };
+const camOf = (c) => ({ z: c.z, tx: c.to[0] - c.z * c.p[0], ty: c.to[1] - c.z * c.p[1] });
+const camMix = (a, b, u) => ({ z: lerp(a.z, b.z, u), tx: lerp(a.tx, b.tx, u), ty: lerp(a.ty, b.ty, u) });
+// an eased push-in over [a, b] to cam, optionally pulled back over [oa, ob]
+function push(t, a, b, cam, oa, ob) { let u = EZ.io(seg(t, a, b)); if (oa != null) u *= 1 - EZ.io(seg(t, oa, ob)); return u > 0 ? camMix(CAM0, camOf(cam), u) : null; }
+// a zoom bump on every beat from t0, centred on point p (the hero keeps its screen spot)
+function bump(t, t0, p, amt = 0.3, every = 0.5) { return camOf({ z: 1 + amt * Math.exp(-mod(t - t0, every) * 7), p, to: p }); }
+function camAt(era, t) { return (typeof pieceCam === 'function' && pieceCam(era, t)) || CAM0; }
+const camPts = (P, c) => P.map(([x, y]) => [c.z * x + c.tx, c.z * y + c.ty]);
+// ---- bridge shapes
+function starPts(x, y, r, n, r0 = -Math.PI / 2, m = 96) {
+  const P = []; for (let i = 0; i < m; i++) { const a = i / m * TAU, k = 0.42 + 0.58 * (0.5 + 0.5 * Math.cos(n * (a - r0))) ** 3; P.push([x + Math.cos(a) * r * k, y + Math.sin(a) * r * k]); }
+  return P;
+}
+const SP = (x, y, r, n) => ({ spark: [x, y, r, n] });
+const shapeOf = (s) => (s.spark ? { P: (STYLE.heroPts || starPts)(...s.spark), c: STYLE.heroColor, spark: s.spark } : s);
+function byAngle(P, m = 96) {   // resample a closed outline to m points by angle around its centroid
+  const c = P.reduce((a, p) => [a[0] + p[0] / P.length, a[1] + p[1] / P.length], [0, 0]), Q = resample(P, true, 4), out = [];
+  for (let i = 0; i < m; i++) {
+    const a = -Math.PI + i / m * TAU; let best = null, bd = 1e9;
+    for (const q of Q) { let d = Math.atan2(q[1] - c[1], q[0] - c[0]) - a; d = Math.abs(Math.atan2(Math.sin(d), Math.cos(d))); const r = Math.hypot(q[0] - c[0], q[1] - c[1]); if (d < bd - 1e-4 || (Math.abs(d - bd) < 1e-4 && r > best[2])) { bd = d; best = [q[0], q[1], r]; } }
+    out.push([best[0], best[1]]);
+  }
+  return { P: out, c };
+}
+const mixHex = (a, b, u) => { const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); const x = p(a), y = p(b); return `rgb(${x.map((v, i) => Math.round(lerp(v, y[i], u))).join(',')})`; };
+function maskK(P) {   // how far the window must scale about its centroid to cover the frame
+  const c = P.reduce((a, p) => [a[0] + p[0] / P.length, a[1] + p[1] / P.length], [0, 0]);
+  const rmin = Math.max(8, Math.min(...byAngle(P, 48).P.map((p) => Math.hypot(p[0] - c[0], p[1] - c[1]))));
+  const far = Math.max(...[[0, 0], [W, 0], [0, H], [W, H]].map((q) => Math.hypot(q[0] - c[0], q[1] - c[1])));
+  return { c, kmax: far / rmin * 1.1 };
+}
+const scaled = (P, c, k) => P.map(([x, y]) => [c[0] + (x - c[0]) * k, c[1] + (y - c[1]) * k]);
+// ---- layers and windows
+const LAYER = [];
+function layer(i) { if (!LAYER[i]) { const c = document.createElement('canvas'); c.width = W; c.height = H; LAYER[i] = c; } return LAYER[i]; }
+function renderEra(e, target) {   // draws era e into target; returns its overlay queue (year tag, caption)
+  const saved = ctx; ctx = target.getContext('2d');
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.setLineDash([]);
+  ctx.fillStyle = STYLE.paper; ctx.fillRect(0, 0, W, H);   // a clean sheet every frame: nothing carries over between frames
+  const cam = camAt(e, TT); ctx.setTransform(cam.z, 0, 0, cam.z, cam.tx, cam.ty);
+  DEFER = []; ERA_LIST[e][2](); const q = DEFER; DEFER = null;
+  ctx.restore(); ctx = saved;
+  return q;
+}
+function flush(q, e) { const keep = E0; E0 = ERA_LIST[e][0]; ctx.setTransform(1, 0, 0, 1, 0, 0); q.forEach((f) => f()); E0 = keep; }
+function shotAtFrame(fr) {
+  for (const s of TIMELINE.shots) if (fr >= Math.round(s.t0 * FPS) && fr < Math.round(s.t1 * FPS)) return s;
+  return TIMELINE.shots[TIMELINE.shots.length - 1];
+}
+const eraAt = (t) => ERA_LIST.findIndex(([a, b]) => t >= a - 1e-6 && t < b - 1e-6);
+// renderFrame(t, canvas, sub): sub = true draws the exact time t between frames (motion blur sub-frames, styles on 1s)
+function renderFrame(t, canvas, sub) {
+  const cv = canvas || document.getElementById('c');
+  ctx = cv.getContext('2d');
+  F = ((Math.floor(sub ? t * FPS + 1e-6 : Math.round(t * FPS)) % NFRAMES) + NFRAMES) % NFRAMES;
+  B = Math.floor(F / 2);
+  TT = (STYLE.ones ? (sub ? F + (t * FPS - Math.floor(t * FPS + 1e-6)) : F) : B * 2) / FPS;
+  // the era is picked by the real frame, so a cut on an odd frame (a 16th at 24fps) lands on that frame;
+  // on its first frame the new era is drawn at its own start time (motion stays on 2s inside it)
+  const s = shotAtFrame(F), e = Math.max(0, eraAt(F / FPS));
+  E0 = ERA_LIST[e][0];
+  if (TT < E0 - 1e-6) TT = E0;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.setLineDash([]); ctx.filter = 'none';
+  SPARK_AT = null;
+  const bd = (r) => r.d ?? 0.6, bm = (r) => r.m ?? (r.d != null ? r.d / 3 : 0.2);
+  const tr = BRIDGES.find((r) => TT >= r.tc - bd(r) - 1e-6 && TT < r.tc + bd(r) - 1e-6);
+  if (!tr) {
+    const q = renderEra(e, layer(0)); ctx.drawImage(layer(0), 0, 0); flush(q, e);
+  } else {
+    const ea = eraAt(tr.tc - 0.01), eb = eraAt(tr.tc + 0.01);
+    const sa = shapeOf(tr.A()), sb = shapeOf(tr.B());
+    const PA = camPts(sa.P, camAt(ea, TT)), PB = camPts(sb.P, camAt(eb, TT));
+    const D = bd(tr), M = bm(tr);
+    if (TT < tr.tc - M) {
+      const u = EZ.i2(seg(TT, tr.tc - D, tr.tc - M)), { c, kmax } = maskK(PA), k = Math.exp(lerp(Math.log(kmax), 0, u));
+      STYLE.backdrop(mixHex(ERA_BG[ea], STYLE.paper, 0.5 + u * 0.5), { eraA: ea, eraB: eb, u, phase: 'shrink' });
+      const q = renderEra(ea, layer(0));
+      STYLE.window(scaled(PA, c, k), 'mA' + tr.tc, layer(0), { c: sa.c, u, phase: 'shrink', eraA: ea, eraB: eb });
+      flush(q, ea);
+    } else if (TT < tr.tc + M) {
+      const u = EZ.io(seg(TT, tr.tc - M, tr.tc + M));
+      STYLE.backdrop(STYLE.paper, { eraA: ea, eraB: eb, u, phase: 'morph' });
+      if (sa.spark && sb.spark) {
+        const ca = camAt(ea, TT), cb = camAt(eb, TT), [ax, ay] = camPts([sa.spark.slice(0, 2)], ca)[0], [bx, by] = camPts([sb.spark.slice(0, 2)], cb)[0];
+        STYLE.hero(lerp(ax, bx, u), lerp(ay, by, u), lerp(sa.spark[2] * ca.z, sb.spark[2] * cb.z, u), { rays: Math.round(lerp(sa.spark[3], sb.spark[3], u)), mood: 'wow', key: 'morphspark' });
+      } else {
+        const A2 = byAngle(PA), B2 = byAngle(PB), M = A2.P.map((p, i) => [lerp(p[0], B2.P[i][0], u), lerp(p[1], B2.P[i][1], u)]);
+        STYLE.blob(M, mixHex(sa.c, sb.c, u), 'morph' + tr.tc, u, { eraA: ea, eraB: eb, phase: 'morph' });
+        if (sb.spark && u > 0.6) STYLE.hero(...camPts([sb.spark.slice(0, 2)], camAt(eb, TT))[0], sb.spark[2] * clamp((u - 0.6) / 0.4), { rays: sb.spark[3], mood: 'wow', key: 'morphspark2' });
+      }
+    } else {
+      const u = EZ.o2(seg(TT, tr.tc + M, tr.tc + D)), { c, kmax } = maskK(PB), k = Math.exp(lerp(0, Math.log(kmax), u));
+      STYLE.backdrop(mixHex(STYLE.paper, ERA_BG[eb], u * 0.5), { eraA: ea, eraB: eb, u, phase: 'grow' });
+      const q = renderEra(eb, layer(0));
+      STYLE.window(scaled(PB, c, k), 'mB' + tr.tc, layer(0), { c: sb.c, u, phase: 'grow', eraA: ea, eraB: eb });
+      flush(q, eb);
+    }
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (STYLE.post) STYLE.post();
+  ctx.restore();
+  return s.id;
+}
+window.renderFrame = renderFrame;
+window.anchorAt = () => (SPARK_AT ? { x: SPARK_AT[0], y: SPARK_AT[1] } : null);
+
+// =====================================================================
+//  kit/board.js — the storyboard: every beat in TIMELINE.board drawn as a 9:16 key frame with its notes.
+//  The panels ARE the piece: each one is renderFrame(t) at the beat's key time, so an approved board
+//  carries straight into the video.  TIMELINE.board = [{ t, title, sound, next }]
+//  Render: node tools/storyboard.mjs <piece dir> [out.png] [panel numbers...]
+// =====================================================================
+function drawPanel(k) { renderFrame(TIMELINE.board[k].t, ctx.canvas); }
+function renderBoard() {
+  const BD = TIMELINE.board || [], COLS = 5, PW = 360, PH = Math.round(PW * H / W), GAP = 30, NOTE = 130, HEAD = 150;
+  const rows = Math.ceil(BD.length / COLS), bc = document.createElement('canvas');
+  bc.width = GAP + COLS * (PW + GAP); bc.height = HEAD + rows * (PH + NOTE + GAP);
+  const g = bc.getContext('2d'), SANS = '"Segoe UI", Arial, sans-serif';
+  g.fillStyle = '#2a211b'; g.fillRect(0, 0, bc.width, bc.height);
+  g.fillStyle = '#efe5cf'; g.font = `400 60px ${HAND}`; g.fillText(`${document.title}: storyboard`, GAP, 80);
+  g.font = `600 22px ${SANS}`; g.fillStyle = '#d9c9a8';
+  g.fillText(`${TIMELINE.duration}s · ${W}×${H} · ${TIMELINE.bpm} BPM · ${BD.length} beats. Thumbs up or down by panel number.`, GAP, 122);
+  const wrap = (str, x, y, maxW, lh) => { let line = ''; for (const w of str.split(' ')) { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y); y += lh; line = w; } else line = t; } if (line) g.fillText(line, x, y); return y + lh; };
+  const pc = document.createElement('canvas'); pc.width = W; pc.height = H;
+  BD.forEach((b, k) => {
+    renderFrame(b.t, pc);
+    const x = GAP + (k % COLS) * (PW + GAP), y = HEAD + Math.floor(k / COLS) * (PH + NOTE + GAP);
+    g.drawImage(pc, x, y, PW, PH);
+    g.fillStyle = '#f0b27c'; g.font = `700 26px ${SANS}`; g.fillText(`${k + 1}`, x, y + PH + 32);
+    g.fillStyle = '#efe5cf'; g.font = `600 20px ${SANS}`;
+    let ttl = `${b.t.toFixed(1)}s · ${b.title || ''}`; while (ttl.length > 4 && g.measureText(ttl).width > PW - 44) ttl = ttl.slice(0, -2) + '…';   // fits the panel
+    g.fillText(ttl, x + 40, y + PH + 30);
+    g.font = `400 18px ${SANS}`; g.fillStyle = '#cdbd9c';
+    const yy = b.sound ? wrap('sound: ' + b.sound, x, y + PH + 58, PW, 22) : y + PH + 58;
+    if (b.next) { g.fillStyle = '#a8977a'; wrap('→ ' + b.next, x, yy + 2, PW, 22); }
+  });
+  return bc;
+}
+window.renderBoard = renderBoard; window.drawPanel = drawPanel;
+// =====================================================================
+//  kit/score-head.js — live preview (click to hear), noise/impulse/WAV helpers, and the synth.
+//  buildScore() opens here; the piece's score body follows (src/score.js), then kit/score-tail.js closes it.
+//  Helpers inside buildScore: pluck, noiseHit, sub, sweep, riser, chime, bass, blip, pad, drone, out, osc, env.
+//  Set `to = 'm'` (music bus) or `to = 's'` (sfx bus) before calling them. Notes: nz('D4').
+// =====================================================================
+// live preview: rAF on the 24fps grid; click to hear the score (?t=1.5 freezes a frame)
+const QS = new URLSearchParams(location.search);
+const LIVE = { audio: null, t0: 0, start: performance.now() };
+if (!QS.has('export')) {
+  const cv = document.getElementById('c');
+  if (QS.has('t')) renderFrame(parseFloat(QS.get('t')));
+  else {
+    const tick = () => {
+      const sec = LIVE.audio ? LIVE.audio.currentTime - LIVE.t0 : (performance.now() - LIVE.start) / 1000;
+      const t = ((sec % LOOP_T) + LOOP_T) % LOOP_T;
+      renderFrame(Math.floor(t * FPS) / FPS);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  cv.addEventListener('click', async () => {
+    if (LIVE.audio || typeof buildScore !== 'function') return;
+    const ac = new AudioContext(), score = await buildScore(ac.sampleRate);
+    const buf = ac.createBuffer(2, score.left.length, score.sampleRate);
+    buf.copyToChannel(score.left, 0); buf.copyToChannel(score.right, 1);
+    const src = ac.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(ac.destination);
+    LIVE.t0 = ac.currentTime + 0.05; src.start(LIVE.t0); LIVE.audio = ac;
+  });
+}
+
+const HZ = {
+  A1: 55.0, D2: 73.42, F2: 87.31, A2: 110.0, D3: 146.83, F3: 174.61, A3: 220.0, C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23,
+  Fs4: 369.99, A4: 440.0, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, Fs5: 739.99, A5: 880.0, D6: 1174.66, A6: 1760.0,
+};
+function makeNoise(ac, sec) {
+  const b = ac.createBuffer(1, Math.floor(sec * ac.sampleRate), ac.sampleRate), d = b.getChannelData(0), R = RNG('noise');
+  for (let i = 0; i < d.length; i++) d[i] = R.f() * 2 - 1;
+  return b;
+}
+function makeImpulse(ac, sec, decay) {
+  const n = Math.floor(sec * ac.sampleRate), b = ac.createBuffer(2, n, ac.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = b.getChannelData(c), R = RNG('ir', c); for (let i = 0; i < n; i++) d[i] = (R.f() * 2 - 1) * Math.pow(1 - i / n, decay); }
+  return b;
+}
+function encodeWav(left, right, sr) {
+  const n = left.length, buf = new ArrayBuffer(44 + n * 4), v = new DataView(buf);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, 'RIFF'); v.setUint32(4, 36 + n * 4, true); ws(8, 'WAVE'); ws(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true); v.setUint32(24, sr, true);
+  v.setUint32(28, sr * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true);
+  ws(36, 'da' + 'ta'); v.setUint32(40, n * 4, true);
+  let o = 44;
+  for (let i = 0; i < n; i++) { v.setInt16(o, Math.round(clamp(left[i], -1, 1) * 32767), true); v.setInt16(o + 2, Math.round(clamp(right[i], -1, 1) * 32767), true); o += 4; }
+  return new Uint8Array(buf);
+}
+
+
+const MIDI = (m) => 440 * 2 ** ((m - 69) / 12);
+const NOTE = { D2: 38, A2: 45, D3: 50, E3: 52, Fs3: 54, A3: 57, D4: 62, E4: 64, Fs4: 66, G4: 67, A4: 69, B4: 71, Cs5: 73, D5: 74, E5: 76, Fs5: 78, A5: 81, B5: 83, D6: 86, E6: 88, Fs6: 90, A6: 93 };
+// any note name: 'D4', 'Fs4' / 'F#4' (sharp), 'Bb3' (flat); the table above is the fast path
+function noteNum(n) {
+  if (NOTE[n] != null) return NOTE[n];
+  const m = /^([A-G])(s|#|b)?(-?\d)$/.exec(n); if (!m) throw new Error(`unknown note "${n}"`);
+  return 12 * (Number(m[3]) + 1) + { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] === 'b' ? -1 : m[2] ? 1 : 0);
+}
+const nz = (n) => MIDI(noteNum(n));
+async function buildScore(sampleRate = 48000, part = 'mix', normIn = null) {
+  const TAIL = 3.0, len = Math.ceil((LOOP_T + TAIL) * sampleRate);
+  const ac = new OfflineAudioContext(2, len, sampleRate);
+  const master = ac.createGain(); master.gain.value = 0.8;
+  const comp = ac.createDynamicsCompressor();
+  comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 3.5; comp.attack.value = 0.004; comp.release.value = 0.2;
+  master.connect(comp); comp.connect(ac.destination);
+  const musicBus = ac.createGain(), sfxBus = ac.createGain();
+  musicBus.gain.value = part === 'sfx' ? 0 : 1; sfxBus.gain.value = part === 'music' ? 0 : 1;
+  musicBus.connect(master); sfxBus.connect(master);
+  // ducking + presence dip, driven by the narration (lines closer than 0.29s are merged)
+  const duck = ac.createGain(), dip = ac.createBiquadFilter();
+  dip.type = 'peaking'; dip.frequency.value = 2500; dip.Q.value = 1;
+  duck.connect(dip); dip.connect(musicBus);
+  const lines = [];
+  for (const n of TIMELINE.narration) { const L = lines[lines.length - 1]; if (L && n.t0 - L.t1 < 0.29) L.t1 = n.t1; else lines.push({ t0: n.t0, t1: n.t1 }); }
+  const DUCK = 10 ** (-3 / 20);
+  duck.gain.setValueAtTime(1, 0); dip.gain.setValueAtTime(0, 0);
+  for (const L of lines) {
+    duck.gain.setValueAtTime(1, Math.max(0, L.t0 - 0.1)); duck.gain.linearRampToValueAtTime(DUCK, L.t0);
+    duck.gain.setValueAtTime(DUCK, L.t1 + 0.03); duck.gain.linearRampToValueAtTime(1, L.t1 + 0.18);
+    dip.gain.setValueAtTime(0, Math.max(0, L.t0 - 0.1)); dip.gain.linearRampToValueAtTime(-6, L.t0);
+    dip.gain.setValueAtTime(-6, L.t1 + 0.03); dip.gain.linearRampToValueAtTime(0, L.t1 + 0.18);
+  }
+  const mkVerb = (dest, sec = 1.6, decay = 2.8, level = 0.3) => { const v = ac.createConvolver(); v.buffer = makeImpulse(ac, sec, decay); const g = ac.createGain(); g.gain.value = level; v.connect(g); g.connect(dest); return v; };
+  const verbs = { m: mkVerb(duck), s: mkVerb(sfxBus) }, shortVerb = verbs.m, longVerb = mkVerb(duck, 3.6, 1.6, 0.55);
+  const noise = makeNoise(ac, 3.0);
+  let to = 'm';   // which bus the helpers below write to
+
+  // the gain is silent until the envelope starts (a GainNode defaults to 1: a note whose oscillator starts first would click)
+  const env = (g, t, a, peak, d) => { g.gain.value = 0.0001; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
+  const out = (node, pan = 0, send = 0) => {
+    const p = ac.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); node.connect(p); p.connect(to === 'm' ? duck : sfxBus);
+    if (send) { const s = ac.createGain(); s.gain.value = send; node.connect(s); s.connect(verbs[to]); }
+  };
+  const osc = (type, f, t, stop) => { const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); o.start(t); o.stop(stop); return o; };
+  function pluck(t, f, vel, pan = 0, dur = 0.32, bright = 3200, send = 0.25) {
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 2.5;
+    lp.frequency.setValueAtTime(bright, t); lp.frequency.exponentialRampToValueAtTime(380, t + dur);
+    const g = ac.createGain(); env(g, t, 0.003, vel, dur);
+    const g2 = ac.createGain(); g2.gain.value = 0.3;
+    osc('triangle', f, t, t + dur + 0.05).connect(lp);
+    osc('sine', f * 2.004, t, t + dur + 0.05).connect(g2); g2.connect(lp);
+    lp.connect(g); out(g, pan, send);
+  }
+  function noiseHit(t, dur, type, freq, q, vel, pan = 0, send = 0, sweepTo = 0) {
+    const src = ac.createBufferSource(); src.buffer = noise;
+    const f = ac.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(freq, t);
+    if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
+    const g = ac.createGain(); env(g, t, Math.min(0.004, dur * 0.3), vel, dur);
+    src.connect(f); f.connect(g); out(g, pan, send);
+    src.start(t, (t * 7.31) % 2.0); src.stop(t + dur + 0.05);
+  }
+  function sub(t, vel) {
+    const o = osc('sine', 120, t, t + 0.8); o.frequency.exponentialRampToValueAtTime(36, t + 0.3);
+    const g = ac.createGain(); env(g, t, 0.004, vel, 0.6); o.connect(g); out(g);
+    noiseHit(t, 0.07, 'lowpass', 1100, 0.7, vel * 0.45);
+  }
+  function sweep(t0, t1, vel, f0, f1, pan = 0) {
+    const src = ac.createBufferSource(); src.buffer = noise; src.loop = true;
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.1;
+    f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(f1, t1);
+    const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vel, t1 - 0.03); g.gain.linearRampToValueAtTime(0.0001, t1 + 0.005);
+    src.connect(f); f.connect(g); out(g, pan, 0.2); src.start(t0, (t0 * 3.1) % 1.0); src.stop(t1 + 0.05);
+  }
+  function riser(t0, t1, vel) {
+    const o = osc('sawtooth', 110, t0, t1 + 0.02); o.frequency.exponentialRampToValueAtTime(1320, t1);
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 6; lp.frequency.setValueAtTime(300, t0); lp.frequency.exponentialRampToValueAtTime(5000, t1);
+    const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vel, t1 - 0.01); g.gain.linearRampToValueAtTime(0.0001, t1 + 0.01);
+    o.connect(lp); lp.connect(g); out(g, 0, 0.3);
+    sweep(t0, t1, vel * 0.9, 400, 7000);
+  }
+  function chime(t, freqs, vel, pan = 0) {
+    freqs.forEach((f, i) => { const g = ac.createGain(), ti = t + i * 0.012; env(g, ti, 0.002, vel / (1 + i * 0.4), 1.3); osc('sine', f, ti, ti + 1.5).connect(g); out(g, pan + (i - 1) * 0.25, 0.6); });
+  }
+  function bass(t, f, vel) { const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 320; const g = ac.createGain(); env(g, t, 0.006, vel, 0.28); osc('triangle', f, t, t + 0.35).connect(lp); lp.connect(g); out(g); }
+  function blip(t, f0, f1, dur, vel, pan = 0) { const o = osc('sine', f0, t, t + dur + 0.05); o.frequency.exponentialRampToValueAtTime(f1, t + dur); const g = ac.createGain(); env(g, t, 0.002, vel, dur); o.connect(g); out(g, pan, 0.2); }
+
+  // ---- v2 instruments built from the helpers above
+  function pad(t0, t1, notes, peak, o = {}) {
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = o.cut ?? 1200; lp.Q.value = 0.7;
+    const g = ac.createGain(), hold = o.swellTo ?? peak;
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(peak, t0 + (o.att ?? 0.4));
+    if (o.swellTo) g.gain.linearRampToValueAtTime(o.swellTo, o.swellAt);
+    g.gain.setValueAtTime(hold, t1 - (o.rel ?? 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t1);
+    notes.forEach((n, i) => { for (const det of [-7, 7]) { const oo = osc(o.type ?? 'sawtooth', nz(n), t0, t1 + 0.05); oo.detune.value = det + i; oo.connect(lp); } });
+    lp.connect(g); out(g, o.pan ?? 0, o.send ?? 0.4);
+  }
+  function drone(t0, t1, f, peak, o = {}) {
+    const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(peak, t0 + (o.att ?? 0.5));
+    g.gain.setValueAtTime(peak, t1 - (o.rel ?? 0.4)); g.gain.exponentialRampToValueAtTime(0.0001, t1);
+    osc('sine', f, t0, t1 + 0.05).connect(g); out(g, 0, 0);
+  }
+  const claudeMotif = (t, notes, vel) => notes.forEach(([n, dt], i) => pluck(t + dt, nz(n), vel, -0.15 + i * 0.1, 0.6, 1300, 0.35));
+  const childMotif = (t, notes, vel, bright = 5200, send = 0.3) => notes.forEach(([n, dt], i) => pluck(t + dt, nz(n), vel, 0.2 - i * 0.1, 0.32, bright, send));
+  // =====================================================================
+  //  SCORE — devakala demo. Indian classical atmosphere.
+  //  Era 1 (0-4s): deep drone + slow pad, meditative. A pluck cascade on the lotus rise.
+  //  Era 2 (4-8s): warm chord opens, a pentatonic pluck cascade as the lotus blooms.
+  // =====================================================================
+  const T = TIMELINE, cu = T.cues;
+  to = 'm';
+
+  // Era 1: deep drone + meditative pad (Sa-Pa / D-A)
+  drone(0.0, 4.1, 73.4, 0.018);                          // D2 drone — the cosmic sustain
+  pad(0.0, 4.1, ['D3', 'A3', 'D4'], 0.030, { type: 'triangle', cut: 600, att: 0.2, rel: 0.3 });
+
+  // A gentle pluck motif as the lotus rises
+  ['A4', 'D5', 'Fs5'].forEach((n, i) => pluck(cu.lotusRise + i * E8, nz(n), 0.14, 0, 0.7, 2800, 0.3));
+
+  // Era 2: the halo opens — a warm bright chord
+  pad(4.0, 8.05, ['D3', 'A3', 'Fs4', 'A4'], 0.048, { cut: 1400, att: 0.35, rel: 0.4, send: 0.45 });
+  chime(4.0, ['D5', 'Fs5', 'A5'], 0.12);
+
+  // Pluck cascade as the lotus blooms
+  ['D5', 'E5', 'Fs5', 'A5', 'B5', 'D6'].forEach((n, i) =>
+    pluck(cu.bloom + i * E16, nz(n), 0.10, 0.25 - i * 0.08, 0.5, 4400, 0.35));
+
+  to = 's';
+  sweep(3.7, 4.05, 0.010, 400, 2200, 0);   // a soft shimmer into the morph
+  // =====================================================================
+  //  kit/score-tail.js — render, fold the tail over the loop point, loudness stage
+  //  (RMS-normalise to -17 dBFS, look-ahead limiter at -1 dBFS; stems share the mix gain curve)
+  // =====================================================================
+  const buf = await ac.startRendering();
+  // fold the tail over the loop point so the loop is seamless
+  const N = Math.round(LOOP_T * sampleRate), L = new Float32Array(N), Rr = new Float32Array(N);
+  const c0 = buf.getChannelData(0), c1 = buf.getChannelData(1);
+  for (let i = 0; i < N; i++) { L[i] = c0[i] + (i + N < len ? c0[i + N] : 0); Rr[i] = c1[i] + (i + N < len ? c1[i + N] : 0); }
+  // loudness for a phone (subagents-short): RMS-normalise to -17 dBFS, then a look-ahead limiter at -1 dBFS.
+  // Stems reuse the mix's gain and gain curve, so they sum back to the mix.
+  let k = normIn?.k, g = normIn?.g;
+  if (!g) {
+    let sum = 0; for (let i = 0; i < N; i++) sum += (L[i] * L[i] + Rr[i] * Rr[i]) / 2;
+    k = 10 ** (-17 / 20) / Math.sqrt(sum / N || 1e-12);
+    const ceil = 0.89; g = new Float32Array(N);
+    for (let i = 0; i < N; i++) { const p = Math.max(Math.abs(L[i]), Math.abs(Rr[i])) * k; g[i] = p > ceil ? ceil / p : 1; }
+    const att = Math.exp(-1 / (0.0015 * sampleRate)), rel = Math.exp(-1 / (0.09 * sampleRate));
+    for (let i = N - 2; i >= 0; i--) g[i] = Math.min(g[i], 1 - (1 - g[i + 1]) * att);
+    let r = 1; for (let i = 0; i < N; i++) { r = Math.min(g[i], 1 - (1 - r) * rel); g[i] = r; }
+  }
+  for (let i = 0; i < N; i++) { L[i] *= k * g[i]; Rr[i] *= k * g[i]; }
+  return { left: L, right: Rr, sampleRate, norm: { k, g } };
+}
+function wavB64(s) {
+  const bytes = encodeWav(s.left, s.right, s.sampleRate);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+async function renderAudioWav() { return wavB64(await buildScore(48000, 'mix')); }
+async function renderAudioStems() {
+  const mix = await buildScore(48000, 'mix');
+  const music = await buildScore(48000, 'music', mix.norm), sfx = await buildScore(48000, 'sfx', mix.norm);
+  return { music: wavB64(music), sfx: wavB64(sfx) };
+}
+window.renderAudioWav = renderAudioWav;
+window.renderAudioStems = renderAudioStems;
+</script>
+</body>
+</html>

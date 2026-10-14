@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Devakala demo</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0e18; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { height: min(100vh, calc(100vw * 16 / 9)); width: auto; aspect-ratio: 9 / 16; display: block; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+"use strict";
+// =====================================================================
+//  DEVAKALA DEMO — 9:16, 8.0s @ 120 BPM, 24fps.
+//  Era 1 (cosmic night): Shesha's dream — reclining figure, lotus rising.
+//  Era 2 (parchment day): the garden — halo, bloomed lotus, foliage.
+//  Bridge: the cosmic disc (top of era 1) → the golden halo (era 2).
+// =====================================================================
+const FPS = 24, W = 1080, H = 1920;
+const BPM = 120, BEAT = 60 / BPM, E8 = BEAT / 2, E16 = BEAT / 4;
+const DURATION = 8.0;
+const NFRAMES = Math.round(DURATION * FPS);
+const LOOP_T = NFRAMES / FPS;
+const SAFE = { top: 240, bottom: 420, right: 140 };
+const HAND = '"Palatino Linotype", "Palatino", "Book Antiqua", "Georgia", serif';   // classical serif — Windows, macOS, Linux
+const CX = 540;
+
+// eras: [t0, t1, scene function]
+const ERA_LIST = [[0, 4, () => sceneCosmic()], [4, 8, () => sceneGarden()]];
+const SHOTS = [
+  ['cosmic',  0,  0.0, 4.0, 'Shesha\'s dream — the lotus rises'],
+  ['garden',  1,  4.0, 8.0, 'the cosmic disc opens into the halo; the garden blooms'],
+];
+const TIMELINE = {
+  width: W, height: H, fps: FPS, bpm: BPM, duration: DURATION, frames: NFRAMES, loop: LOOP_T, safe: SAFE,
+  format: 'morph-chain',
+  shots: SHOTS.map(([key, era, t0, t1, title], i) => ({ id: i + 1, key, era, t0, t1, title })),
+  cuts: [],
+  morphs: [4.0],
+  cues: { lotusRise: 1.2, bloom: 4.8 },
+  acts: [
+    { name: '1 Cosmic night', role: 'build',   t0: 0.0, t1: 4.0 },
+    { name: '2 Garden',       role: 'gift',    t0: 4.0, t1: 8.0 },
+  ],
+  board: [
+    { t: 2.0,  title: 'the reclining figure, lotus stem rising', sound: 'deep pad, a slow fifth', next: 'the cosmic disc closes in' },
+    { t: 6.0,  title: 'the halo opens, lotus blooms', sound: 'bright chord, pluck cascade', next: 'loops' },
+  ],
+  narration: [],
+};
+window.TIMELINE = TIMELINE;
