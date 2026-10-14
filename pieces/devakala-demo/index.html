@@ -584,55 +584,44 @@ function drawAsset(name, x, y, w, h, o = {}) {
   ctx.restore(); return true;
 }
 // =====================================================================
-//  styles/devakala/kit.js — Kerala mural / classical Indian mythological style
-//  Palette measured from 5 reference images (references/devakala/1-5.jpg):
-//    ref 1: bold modern Kerala-inspired (navy, red lotus, large reclining Vishnu)
-//    ref 2: true Kerala mural (warm parchment, scrollwork, blue Krishna, teardrop border)
-//    ref 3: Indian miniature (cream ground, Lakshmi with elephant, pink lotus)
-//    ref 4: modern illustration (dark teal, Vishnu with Shesha, gold ornaments)
-//    ref 5: Kerala/Rajput (ochre ground, reclining dark Vishnu, gold, curved lotus stem)
-//  No sharp edges: all shapes use ellipses or smooth petal curves. Flat fills, bold
-//  warm outlines, lotus motifs, gold halos, Kerala spiral foliage, teardrop borders.
-//  On 2s. Built on kit/core.js. Needs HAND, CX from the piece head.
+//  styles/devakala/kit.js — Kerala mural / classical Indian style (premium)
+//  Palette measured from 5 reference images (references/devakala/1-5.jpg).
+//  Premium features: gradient petal fills, gold shadow glow, ornate halo with
+//  outer petal ring, canvas shadow on key gold elements, dense scrollwork.
+//  All shapes use ellipses or petalPts — no sharp corners. On 2s.
+//  Built on kit/core.js. Needs HAND, CX from the piece head.
 // =====================================================================
 const DK = {
-  ink:       '#1A0800',   // warm near-black outlines
-  parchment: '#F5CB6B',   // warm gold parchment (ref 2)
-  parchL:    '#FCE8B0',   // light parchment
-  parchD:    '#C49040',   // deep ochre
-  cosmic:    '#0D1E30',   // deep navy night (ref 1)
-  teal:      '#0C3240',   // forest teal (ref 4)
-
-  gold:      '#D4943A',   // ornament gold
-  goldL:     '#F0B840',   // highlight gold
-  goldD:     '#8B5A10',   // shadow gold
-
-  blue:      '#4A80B8',   // divine skin (Krishna, Vishnu — refs 2, 4)
-  blueD:     '#2A5080',   // deep divine blue
-
-  ivory:     '#F0E5C8',   // ivory / light figures
-  ivoryD:    '#D4C8A0',   // warm ivory shadow
-
-  red:       '#C03020',   // vermillion (lotus, cosmic — ref 1)
-  redL:      '#E05030',   // bright vermillion
-  redD:      '#8A1810',   // deep red (back petals)
-
-  lotus:     '#E890A0',   // pink lotus (ref 3)
-  lotusD:    '#C05070',   // deep pink lotus
-
-  green:     '#2A5C28',   // lotus stem / foliage
-  greenL:    '#4A8040',   // light foliage
-
-  saffron:   '#E07030',   // saffron garment
-  saffronL:  '#F09040',   // bright saffron
-
-  paper:     '#E8C070',   // morph paper
+  ink:       '#1A0800',
+  parchment: '#F5CB6B',
+  parchL:    '#FCE8B0',
+  parchD:    '#C49040',
+  cosmic:    '#0D1E30',
+  teal:      '#0C3240',
+  gold:      '#D4943A',
+  goldL:     '#F0B840',
+  goldD:     '#8B5A10',
+  blue:      '#4A80B8',
+  blueD:     '#2A5080',
+  ivory:     '#F0E5C8',
+  ivoryD:    '#D4C8A0',
+  red:       '#C03020',
+  redL:      '#E05030',
+  redD:      '#8A1810',
+  lotus:     '#E890A0',
+  lotusD:    '#C05070',
+  green:     '#2A5C28',
+  greenL:    '#4A8040',
+  saffron:   '#E07030',
+  saffronL:  '#F09040',
+  paper:     '#E8C070',
 };
 
 // =====================================================================
 //  Core shape: flat-fill, bold outline, gentle boil on 2s
 // =====================================================================
-function dkShape(P, c, o = {}) {
+function dkShape(P, c, o) {
+  o = o ?? {};
   const key = o.key ?? 'dks';
   const Q = o.raw ? P : wobble(P, true, o.amt ?? 0.4, key, 7);
   ctx.save();
@@ -650,157 +639,221 @@ function dkShape(P, c, o = {}) {
 }
 
 // =====================================================================
-//  Smooth lotus petal points — no sharp corners.
-//  tipX, tipY: petal tip  |  baseX, baseY: petal base (lotus center)
-//  pw: half-width at the widest point  |  n: point count
+//  Smooth lotus petal points — tip-to-base parametrisation, no corners.
+//  tipX,tipY: where the tip points; baseX,baseY: petal base (lotus centre)
+//  pw: half-width at widest; n: point count
 // =====================================================================
 function petalPts(tipX, tipY, baseX, baseY, pw, n) {
   n = n || 24;
   const dx = tipX - baseX, dy = tipY - baseY;
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  const ux = dx / len, uy = dy / len;   // along axis (base→tip)
-  const nx = -uy, ny = ux;              // left normal
+  const ux = dx / len, uy = dy / len;
+  const nx = -uy, ny = ux;
   const pts = [];
   for (let i = 0; i < n; i++) {
     const t = i / n;
     let along, across;
     if (t < 0.5) {
-      const u = t * 2;      // 0→1: base to tip, LEFT side
+      const u = t * 2;
       along = u;
       across = -pw * Math.sin(Math.PI * u);
     } else {
-      const u = (t - 0.5) * 2;  // 0→1: tip to base, RIGHT side
+      const u = (t - 0.5) * 2;
       along = 1 - u;
       across = pw * Math.sin(Math.PI * (1 - u));
     }
-    pts.push([
-      baseX + ux * len * along + nx * across,
-      baseY + uy * len * along + ny * across,
-    ]);
+    pts.push([baseX + ux * len * along + nx * across,
+              baseY + uy * len * along + ny * across]);
   }
   return pts;
 }
 
 // =====================================================================
-//  Lotus — the style's signature motif (redesigned with petalPts)
-//  Petals radiate from (x,y); r = tip-radius; open: 0=bud, 1=bloom
+//  Gradient petal — premium fill (luminous centre, deeper at edges)
+//  Draws one petal with a linear gradient fill and bold outline.
 // =====================================================================
-function dkLotus(x, y, r, o = {}) {
+function dkPetalGrad(tipX, tipY, baseX, baseY, pw, c, ci, key, amt) {
+  const pts = petalPts(tipX, tipY, baseX, baseY, pw, 24);
+  const Q = wobble(pts, true, amt ?? 0.22, key, 7);
+  const grd = ctx.createLinearGradient(baseX, baseY, tipX, tipY);
+  grd.addColorStop(0.0, ci);
+  grd.addColorStop(0.3, c);
+  grd.addColorStop(0.72, c);
+  grd.addColorStop(1.0, ci);
+  ctx.save();
+  trace(Q, true);
+  ctx.fillStyle = grd;
+  ctx.fill();
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = DK.ink;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.restore();
+}
+
+// =====================================================================
+//  Lotus — redesigned with gradient petals & 12-petal default
+// =====================================================================
+function dkLotus(x, y, r, o) {
+  o = o ?? {};
   const key  = o.key  ?? 'lot';
-  const n    = o.n    ?? 8;
+  const n    = o.n    ?? 12;
   const c    = o.c    ?? DK.lotus;
   const ci   = o.ci  ?? DK.lotusD;
   const open = clamp(o.open ?? 1);
 
   if (open < 0.08) {
-    // Closed bud: one upright petal cluster
     dkShape(petalPts(x, y - r * 0.55, x, y + r * 0.1, r * 0.18, 20), c, { key: key + 'bud', w: 3, amt: 0.25 });
     dkShape(ellipsePts(x, y + r * 0.22, r * 0.2, r * 0.14, 0, 18), DK.green, { key: key + 'sep', w: 2 });
     return;
   }
 
-  const pw = r * 0.56;
+  const pw = r * 0.52;
 
-  // Back layer (offset half-step, slightly shorter, darker)
+  // Back layer (offset half-step, darker)
   for (let i = 0; i < n; i++) {
     const a = (i / n + 0.5 / n) * TAU;
-    const cr = r * (0.8 + 0.2 * open);
-    const pts = petalPts(x + Math.cos(a) * cr, y + Math.sin(a) * cr, x, y, pw * 0.85, 22);
-    dkShape(pts, ci, { key: key + 'bk' + i, amt: 0.22, w: 3.5 });
+    const cr = r * (0.78 + 0.22 * open);
+    dkPetalGrad(x + Math.cos(a) * cr, y + Math.sin(a) * cr, x, y, pw * 0.82, ci, DK.redD || '#8A1810', key + 'bk' + i, 0.20);
   }
 
-  // Front layer
+  // Front layer with inner vein highlight
   for (let i = 0; i < n; i++) {
     const a = (i / n) * TAU;
-    const cr = r * (0.85 + 0.15 * open);
-    const pts = petalPts(x + Math.cos(a) * cr, y + Math.sin(a) * cr, x, y, pw, 22);
-    dkShape(pts, c, { key: key + 'ft' + i, amt: 0.25, w: 3.5 });
-    // Inner vein highlight
-    const veinTipX = x + Math.cos(a) * cr * 0.7;
-    const veinTipY = y + Math.sin(a) * cr * 0.7;
-    const veinPts = petalPts(veinTipX, veinTipY, x + Math.cos(a) * cr * 0.1, y + Math.sin(a) * cr * 0.1, pw * 0.28, 14);
-    dkShape(veinPts, ci, { key: key + 've' + i, amt: 0.18, w: 0, line: false });
+    const cr = r * (0.84 + 0.16 * open);
+    const tipX = x + Math.cos(a) * cr, tipY = y + Math.sin(a) * cr;
+    dkPetalGrad(tipX, tipY, x, y, pw, c, ci, key + 'ft' + i, 0.23);
+    // Thin vein
+    const vx = x + Math.cos(a) * cr * 0.68, vy = y + Math.sin(a) * cr * 0.68;
+    dkShape(petalPts(vx, vy, x + Math.cos(a) * cr * 0.12, y + Math.sin(a) * cr * 0.12, pw * 0.25, 12),
+      ci, { key: key + 've' + i, amt: 0.14, w: 0, line: false });
   }
 
-  // Sepal ring (green calyx)
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * TAU;
-    dkShape(ellipsePts(x + Math.cos(a) * r * 0.14, y + Math.sin(a) * r * 0.14, r * 0.09, r * 0.18, a, 14),
-      DK.green, { key: key + 'sp' + i, amt: 0.22, w: 2 });
+  // Sepal ring
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU;
+    dkShape(ellipsePts(x + Math.cos(a) * r * 0.13, y + Math.sin(a) * r * 0.13, r * 0.085, r * 0.17, a, 14),
+      DK.green, { key: key + 'sp' + i, amt: 0.2, w: 2 });
   }
 
-  // Gold centre disc
-  dkShape(ellipsePts(x, y, r * 0.2, r * 0.2, 0, 28), DK.goldL, { key: key + 'ctr', w: 2.5, line: DK.goldD, amt: 0.12 });
+  // Centre disc (gold with glow)
+  ctx.save();
+  ctx.shadowColor = 'rgba(240,180,40,0.55)';
+  ctx.shadowBlur = 18;
+  dkShape(ellipsePts(x, y, r * 0.22, r * 0.22, 0, 28), DK.goldL, { key: key + 'ctr', w: 2.5, line: DK.goldD, amt: 0.1 });
+  ctx.restore();
+
   // Stamen dots
   const Rs = RNG('lot', key);
   ctx.fillStyle = DK.goldD;
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * TAU, dr = r * Rs.r(0.04, 0.12);
-    ctx.beginPath(); ctx.arc(x + Math.cos(a) * dr, y + Math.sin(a) * dr, 3.5, 0, TAU); ctx.fill();
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * TAU, dr = r * Rs.r(0.04, 0.14);
+    ctx.beginPath(); ctx.arc(x + Math.cos(a) * dr, y + Math.sin(a) * dr, 4, 0, TAU); ctx.fill();
   }
 }
 
 // =====================================================================
-//  Halo — circular gold mandala
+//  Halo — ornate gold mandorla with outer petal crown and shadow glow
 // =====================================================================
 function dkHalo(x, y, r, key) {
   key = key ?? 'halo';
-  dkShape(ellipsePts(x, y, r, r, 0, 56), DK.gold, { key: key + 'o', amt: 0.15, w: 6, line: DK.goldD });
-  dkShape(ellipsePts(x, y, r * 0.84, r * 0.84, 0, 56), DK.goldL, { key: key + 'i', amt: 0.08, line: false });
-  for (let i = 0; i < 24; i++) {
-    const a = (i / 24) * TAU;
-    ctx.fillStyle = i % 3 === 0 ? DK.goldD : DK.gold;
-    ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * 0.92, y + Math.sin(a) * r * 0.92,
-      i % 3 === 0 ? 5.5 : 3.5, 0, TAU); ctx.fill();
+
+  // Outermost lotus petal ring (8 petal points radiating outward)
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU;
+    const tpX = x + Math.cos(a) * r * 1.38, tpY = y + Math.sin(a) * r * 1.38;
+    const bsX = x + Math.cos(a) * r * 0.90, bsY = y + Math.sin(a) * r * 0.90;
+    dkPetalGrad(tpX, tpY, bsX, bsY, r * 0.22, DK.goldL, DK.gold, key + 'lp' + i, 0.14);
   }
-  ctx.strokeStyle = DK.goldD; ctx.lineWidth = 1.5;
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * TAU;
+  // Alternating small petals
+  for (let i = 0; i < 8; i++) {
+    const a = ((i + 0.5) / 8) * TAU;
+    const tpX = x + Math.cos(a) * r * 1.18, tpY = y + Math.sin(a) * r * 1.18;
+    const bsX = x + Math.cos(a) * r * 0.88, bsY = y + Math.sin(a) * r * 0.88;
+    dkShape(petalPts(tpX, tpY, bsX, bsY, r * 0.13, 16), DK.gold, { key: key + 'lps' + i, w: 2, line: DK.goldD, amt: 0.12 });
+  }
+
+  // Outer ring with glow
+  ctx.save();
+  ctx.shadowColor = 'rgba(240,180,40,0.50)';
+  ctx.shadowBlur = 45;
+  dkShape(ellipsePts(x, y, r, r, 0, 56), DK.gold, { key: key + 'o', amt: 0.12, w: 6, line: DK.goldD });
+  ctx.restore();
+
+  dkShape(ellipsePts(x, y, r * 0.84, r * 0.84, 0, 56), DK.goldL, { key: key + 'i', amt: 0.07, line: false });
+
+  // Outer dot ring — large-small-small-red pattern
+  for (let i = 0; i < 36; i++) {
+    const a = (i / 36) * TAU;
+    const isRed = i % 9 === 0, isBig = i % 3 === 0;
+    ctx.fillStyle = isRed ? DK.red : (isBig ? DK.goldD : DK.gold);
     ctx.beginPath();
-    ctx.moveTo(x + Math.cos(a) * r * 0.22, y + Math.sin(a) * r * 0.22);
-    ctx.lineTo(x + Math.cos(a) * r * 0.78, y + Math.sin(a) * r * 0.78);
+    ctx.arc(x + Math.cos(a) * r * 0.93, y + Math.sin(a) * r * 0.93,
+      isRed ? 7 : (isBig ? 5 : 3.5), 0, TAU);
+    ctx.fill();
+  }
+
+  // Middle dot ring
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 20) * TAU;
+    ctx.fillStyle = i % 5 === 0 ? DK.red : DK.goldD;
+    ctx.beginPath();
+    ctx.arc(x + Math.cos(a) * r * 0.73, y + Math.sin(a) * r * 0.73,
+      i % 5 === 0 ? 5 : 3, 0, TAU);
+    ctx.fill();
+  }
+
+  // Radial spokes (16)
+  ctx.strokeStyle = DK.goldD; ctx.lineWidth = 1.8;
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * TAU;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * r * 0.20, y + Math.sin(a) * r * 0.20);
+    ctx.lineTo(x + Math.cos(a) * r * 0.66, y + Math.sin(a) * r * 0.66);
     ctx.stroke();
   }
+
+  // Inner centre disc
+  dkShape(ellipsePts(x, y, r * 0.18, r * 0.18, 0, 28), DK.goldL, { key: key + 'c', amt: 0.06, w: 2, line: DK.goldD });
 }
 
 // =====================================================================
-//  Kerala spiral coil — smooth logarithmic spiral (no sharp corners)
+//  Kerala spiral coil — smooth logarithmic spiral
 // =====================================================================
 function dkCoil(x, y, r, key) {
   key = key ?? 'coil';
   const P = [], nPts = 70, turns = 2.5;
   for (let i = 0; i <= nPts; i++) {
     const t = i / nPts, a = t * TAU * turns - Math.PI / 2;
-    const rad = r * (0.05 + 0.95 * t);
-    P.push([x + Math.cos(a) * rad, y + Math.sin(a) * rad]);
+    P.push([x + Math.cos(a) * r * (0.05 + 0.95 * t),
+            y + Math.sin(a) * r * (0.05 + 0.95 * t)]);
   }
   ink(P, { w: Math.max(3.5, r * 0.08), color: DK.green, key, amt: 0.45 });
-  // Leaf at outer end
   dkShape(petalPts(x + r * 0.1, y - r * 0.95, x, y - r * 0.52, r * 0.22, 16),
     DK.greenL, { key: key + 'lf', w: 2.5, amt: 0.35 });
 }
 
 // =====================================================================
-//  Scroll cloud — three rounded lobes (Kerala style, no sharp edges)
+//  Scroll cloud — three rounded lobes
 // =====================================================================
 function dkCloud(x, y, s, key) {
   key = key ?? 'cld';
-  // Main body
-  dkShape(ellipsePts(x, y, s * 0.85, s * 0.38, 0, 32), DK.ivory, { key: key + 'b', amt: 0.35, w: 2.5 });
-  // Left lobe
-  dkShape(ellipsePts(x - s * 0.65, y + s * 0.08, s * 0.34, s * 0.26, -0.25, 26), DK.ivory, { key: key + 'l', amt: 0.30, w: 2.5 });
-  // Right lobe
-  dkShape(ellipsePts(x + s * 0.65, y + s * 0.08, s * 0.34, s * 0.26, 0.25, 26), DK.ivory, { key: key + 'r', amt: 0.30, w: 2.5 });
-  // Top small bump
-  dkShape(ellipsePts(x, y - s * 0.22, s * 0.42, s * 0.24, 0, 22), DK.ivory, { key: key + 't', amt: 0.28, w: 2 });
+  dkShape(ellipsePts(x, y, s * 0.85, s * 0.38, 0, 32), DK.ivory, { key: key + 'b', amt: 0.32, w: 2.5 });
+  dkShape(ellipsePts(x - s * 0.65, y + s * 0.08, s * 0.34, s * 0.26, -0.25, 26), DK.ivory, { key: key + 'l', amt: 0.28, w: 2.5 });
+  dkShape(ellipsePts(x + s * 0.65, y + s * 0.08, s * 0.34, s * 0.26, 0.25, 26), DK.ivory, { key: key + 'r', amt: 0.28, w: 2.5 });
+  dkShape(ellipsePts(x, y - s * 0.22, s * 0.42, s * 0.24, 0, 22), DK.ivory, { key: key + 't', amt: 0.26, w: 2 });
 }
 
 // =====================================================================
-//  Teardrop border strip — top/bottom decorative band (ref 2)
+//  Teardrop border strip — top/bottom decorative band with red dot accents
 // =====================================================================
 function dkBorder(y0, h, c1, c2, key) {
   key = key ?? 'bdr';
   dkShape(rrectPts(-20, y0, W + 40, h, 0), c1, { key: key + 'bg', raw: true, line: false });
+  // Outer line
+  ctx.strokeStyle = DK.goldD; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.rect(0, y0, W, h); ctx.stroke();
   const n = Math.floor(W / (h * 0.82)) + 1, gap = W / n;
   for (let i = 0; i < n; i++) {
     const cx = i * gap + gap / 2, cy = y0 + h / 2;
@@ -808,10 +861,13 @@ function dkBorder(y0, h, c1, c2, key) {
     const P = [];
     for (let j = 0; j <= 30; j++) {
       const t = j / 30, a = t * TAU - Math.PI / 2;
-      const taper = t < 0.5 ? 1 - t * 0.45 : 1;
-      P.push([cx + Math.cos(a) * rx * taper, cy + Math.sin(a) * ry]);
+      P.push([cx + Math.cos(a) * rx * (t < 0.5 ? 1 - t * 0.45 : 1),
+              cy + Math.sin(a) * ry]);
     }
-    dkShape(P, c2, { key: key + 't' + i, amt: 0.18, w: 1.8 });
+    dkShape(P, c2, { key: key + 't' + i, amt: 0.16, w: 1.8 });
+    // Red dot inside each teardrop
+    ctx.fillStyle = DK.red;
+    ctx.beginPath(); ctx.arc(cx, cy - ry * 0.12, ry * 0.2, 0, TAU); ctx.fill();
   }
 }
 
@@ -826,7 +882,11 @@ function dkCaption(str) {
     ctx.restore();
     const pad = 28, bw = tw + pad * 2, bh = size * 1.5;
     const x0 = CX - bw / 2, y0 = H - SAFE.bottom - 90;
+    ctx.save();
+    ctx.shadowColor = 'rgba(180,130,20,0.35)';
+    ctx.shadowBlur = 20;
     dkShape(rrectPts(x0, y0, bw, bh, 10), DK.parchL, { key: 'cap' + str, raw: true, w: 2.5, line: DK.goldD });
+    ctx.restore();
     ctx.save(); ctx.font = `500 ${size}px ${HAND}`; ctx.fillStyle = DK.ink;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const fr = ev(E0 + 0.4, 0.5);
@@ -845,7 +905,11 @@ function dkYearTag(str) {
     ctx.restore();
     const pad = 24, bw = tw + pad * 2 + 60, bh = size * 1.45;
     const x0 = 56, y0 = SAFE.top + 56;
+    ctx.save();
+    ctx.shadowColor = 'rgba(180,130,20,0.35)';
+    ctx.shadowBlur = 16;
     dkShape(rrectPts(x0, y0, bw, bh, 10), DK.parchL, { key: 'yt' + str, raw: true, w: 3, line: DK.gold });
+    ctx.restore();
     dkLotus(x0 + bw + 34, y0 + bh / 2, 22, { key: 'ytl' + str, n: 5, open: popS(E0 + 0.1), c: DK.red, ci: DK.redL });
     ctx.save(); ctx.font = `600 ${size}px ${HAND}`; ctx.fillStyle = DK.ink;
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
@@ -866,11 +930,11 @@ function dkHero(x, y, r, o) {
     const P = [[x, y + r * 0.9], [x - r * 0.12, y + r * 1.55], [x + r * 0.06, y + r * 2.3]];
     ink(P, { w: Math.max(4, r * 0.09), color: DK.green, key: (o.key ?? 'h') + 'st' });
   }
-  dkLotus(x, y, r, { key: o.key ?? 'hero', open: o.open ?? 1, c: o.c ?? DK.red, ci: o.ci ?? DK.redL });
+  dkLotus(x, y, r, { key: o.key ?? 'hero', open: o.open ?? 1, n: 12, c: o.c ?? DK.red, ci: o.ci ?? DK.redL });
   if ((o.open ?? 1) > 0.5) {
     ctx.save();
-    ctx.globalAlpha = ((o.open ?? 1) - 0.5) * 0.15;
-    dkShape(ellipsePts(x, y, r * 1.35, r * 1.35, 0, 36), DK.goldL, { key: (o.key ?? 'h') + 'aur', line: false, raw: true });
+    ctx.globalAlpha = ((o.open ?? 1) - 0.5) * 0.18;
+    dkShape(ellipsePts(x, y, r * 1.4, r * 1.4, 0, 36), DK.goldL, { key: (o.key ?? 'h') + 'aur', line: false, raw: true });
     ctx.restore();
   }
 }
@@ -894,22 +958,17 @@ const STYLE = {
   },
 
   blob(P, c, key) { dkShape(P, c, { key, amt: 0.45 }); },
-
   hero(x, y, r, o) { dkHero(x, y, r * 0.65, { ...(o ?? {}), stem: false }); },
   heroColor: DK.red,
-
   post() {},
-
   ones: false,
 };
 
 // =====================================================================
 //  SCENES — one function per era, world coordinates 1080×1920.
-//  Ref 1 structure (cosmic): large lotus dominates upper third, reclining
-//    Vishnu head below, bottom petal row as Shesha's couch.
-//  Ref 2 structure (garden): parchment mural with spiral scrollwork, blue
-//    deity centered, halo, teardrop border.
-//  All shapes use ellipses or petalPts — no rectangles or sharp corners.
+//  Premium: radial glows, gradient petals, dense scrollwork, layered
+//  ornaments, glowing gold on key elements. All shapes are ellipses or
+//  petalPts — no rectangles or sharp corners.
 // =====================================================================
 
 // ── Era 1: Cosmic night — Shesha's dream ───────────────────────────
@@ -918,71 +977,101 @@ function sceneCosmic() {
   ctx.fillStyle = DK.cosmic;
   ctx.fillRect(0, 0, W, H);
 
-  // 2. Subtle stars (upper two-thirds of frame)
+  // 2. Ambient radial glow at the lotus/disc centre — premium ethereal quality
+  const grdBg = ctx.createRadialGradient(540, 480, 0, 540, 480, 420);
+  grdBg.addColorStop(0,   'rgba(60,100,180,0.30)');
+  grdBg.addColorStop(0.4, 'rgba(30,50,120,0.14)');
+  grdBg.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = grdBg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 3. Stars — 80 stars, some with a subtle glow halo
   const RS = RNG('stars');
-  ctx.fillStyle = 'rgba(240,230,200,0.55)';
-  for (let i = 0; i < 70; i++) {
-    const sx = RS.r(0, W), sy = RS.r(0, H * 0.6);
-    const sr = RS.r(1.5, 3) * (0.7 + 0.3 * (B % 3 === i % 3 ? 1 : 0.6));
+  for (let i = 0; i < 80; i++) {
+    const sx = RS.r(0, W), sy = RS.r(0, H * 0.65);
+    const sr = RS.r(1.2, 3.5) * (0.75 + 0.25 * (B % 4 === i % 4 ? 1 : 0.5));
+    const isGlow = i % 8 === 0;
+    ctx.save();
+    if (isGlow) {
+      ctx.shadowColor = 'rgba(240,230,200,0.85)';
+      ctx.shadowBlur = 14;
+    }
+    ctx.fillStyle = `rgba(240,230,200,${isGlow ? 0.92 : 0.55})`;
     ctx.beginPath(); ctx.arc(sx, sy, sr, 0, TAU); ctx.fill();
+    ctx.restore();
   }
 
-  // 3. Cosmic bridge disc (behind lotus, centred upper third) — morph bridge object
+  // 4. Cosmic bridge disc (behind lotus, centred upper third)
   dkShape(ellipsePts(540, 480, 162, 162, 0, 56), DK.ivory, { key: 'disc', amt: 0.18, w: 6, line: DK.gold });
   dkShape(ellipsePts(540, 480, 132, 132, 0, 48), DK.parchL, { key: 'disci', amt: 0.12, w: 2, line: DK.goldD });
 
-  // 4. Large lotus — the hero, centred at disc position (lotus ≈ 40% of frame width)
+  // 5. Large lotus — the hero, centred at disc position (≈ 40% of frame width)
   const heroOpen = ev(TIMELINE.cues.lotusRise, 1.2);
   dkHero(540, 480, 210, { key: 'hero', open: heroOpen, stem: false, c: DK.red, ci: DK.redL });
 
-  // 5. Two scroll clouds flanking the lotus
+  // 6. Two scroll clouds flanking the lotus
   dkCloud(195, 430, 130, 'cldL');
   dkCloud(885, 430, 130, 'cldR');
 
-  // 6. Thick curved lotus stem — connects lotus base to the reclining figure's navel
+  // 7. Thick curved lotus stem — connects lotus base to the figure's navel
   const stemPts = [
     [540, 690],
-    [520, 820],
-    [500, 960],
-    [480, 1110],
-    [465, 1210],
+    [522, 820],
+    [502, 960],
+    [484, 1110],
+    [468, 1215],
   ];
-  ink(stemPts, { w: 26, color: DK.green, key: 'stem' });
-  ink(stemPts, { w: 13, color: DK.greenL, key: 'stemL' });
+  ink(stemPts, { w: 28, color: DK.green, key: 'stem' });
+  ink(stemPts, { w: 14, color: DK.greenL, key: 'stemL' });
   // Two leaves off the stem
-  dkShape(petalPts(410, 880, 505, 930, 85, 18), DK.green, { key: 'leaf1', w: 3.5, amt: 0.38 });
-  dkShape(petalPts(540, 1060, 480, 1000, 65, 16), DK.green, { key: 'leaf2', w: 3, amt: 0.35 });
+  dkShape(petalPts(408, 878, 506, 930, 88, 20), DK.green, { key: 'leaf1', w: 3.5, amt: 0.38 });
+  dkShape(petalPts(542, 1058, 480, 1000, 68, 18), DK.green, { key: 'leaf2', w: 3, amt: 0.35 });
 
-  // 7. Shesha's coils — smooth overlapping ivory oval bands behind the divine body
+  // 8. Shesha's coils — smooth overlapping ivory oval bands behind the body
   const coilY = 1340;
   for (let i = 0; i < 5; i++) {
     const cx = 520 + (i - 2) * 190;
     const cy = coilY + i * 16;
-    dkShape(ellipsePts(cx, cy, 270 - i * 18, 68 - i * 6, 0, 36),
-      i % 2 === 0 ? '#E0D8C0' : '#D4CCB0', { key: 'coil' + i, w: 4, amt: 0.22 });
+    dkShape(ellipsePts(cx, cy, 272 - i * 18, 68 - i * 6, 0, 36),
+      i % 2 === 0 ? '#E2DAC2' : '#D6CEB2', { key: 'coil' + i, w: 4, amt: 0.22 });
     // Gold ring on each coil
     dkShape(ellipsePts(cx + 55, cy - 18, 30, 16, 0.3, 20),
       DK.gold, { key: 'cring' + i, w: 2.5, line: DK.goldD, amt: 0.18 });
   }
 
-  // 8. Reclining divine body — smooth horizontal ellipse (no rectangles)
+  // 9. Reclining divine body — smooth horizontal ellipse
+  ctx.save();
+  ctx.shadowColor = 'rgba(100,160,240,0.35)';
+  ctx.shadowBlur = 22;
   dkShape(ellipsePts(570, 1250, 490, 88, 0, 48), DK.blue, { key: 'body', w: 5, amt: 0.28 });
-  // Saffron garment — oval over the mid/lower torso
-  dkShape(ellipsePts(630, 1260, 325, 55, 0.12, 36), DK.saffron, { key: 'garment', w: 3, amt: 0.22 });
+  ctx.restore();
+  // Saffron garment — oval over mid/lower torso
+  dkShape(ellipsePts(632, 1260, 326, 55, 0.12, 36), DK.saffron, { key: 'garment', w: 3, amt: 0.22 });
   // Gold waistband
-  dkShape(ellipsePts(570, 1235, 490, 22, 0, 36), DK.gold, { key: 'waist', w: 2.5, line: DK.goldD, amt: 0.18 });
+  dkShape(ellipsePts(570, 1236, 492, 22, 0, 36), DK.gold, { key: 'waist', w: 2.5, line: DK.goldD, amt: 0.18 });
+  // Chest ornament (Srivatsa disc — premium detail)
+  ctx.save();
+  ctx.shadowColor = 'rgba(240,180,40,0.45)';
+  ctx.shadowBlur = 16;
+  dkShape(ellipsePts(242, 1218, 32, 32, 0, 24), DK.gold, { key: 'chest', w: 2.5, line: DK.goldD, amt: 0.12 });
+  ctx.restore();
+  dkShape(ellipsePts(242, 1218, 15, 15, 0, 16), DK.red, { key: 'chestI', w: 0, line: false, raw: true });
+  // Upper arm band
+  dkShape(ellipsePts(340, 1230, 20, 30, -0.18, 18), DK.gold, { key: 'armb', w: 2.5, line: DK.goldD, amt: 0.15 });
   // Gold ankle ornament at far right
   dkShape(ellipsePts(968, 1252, 36, 22, 0.2, 22), DK.gold, { key: 'ankl', w: 2.5, line: DK.goldD, amt: 0.18 });
 
-  // 9. Reclining divine head — large smooth oval, head at LEFT end
-  // Neck connection
-  dkShape(ellipsePts(270, 1195, 48, 62, 0, 24), DK.blue, { key: 'neck', w: 4, amt: 0.25 });
-  // Head (ivory-toned divine face, reading reclined to the right)
+  // 10. Reclining divine head — large smooth oval, head at LEFT end
+  dkShape(ellipsePts(270, 1196, 48, 62, 0, 24), DK.blue, { key: 'neck', w: 4, amt: 0.25 });
+  ctx.save();
+  ctx.shadowColor = 'rgba(100,160,240,0.38)';
+  ctx.shadowBlur = 20;
   dkShape(ellipsePts(195, 1095, 152, 178, 0, 48), DK.blue, { key: 'head', w: 5, amt: 0.25 });
-  // Face highlight (lighter inner glow on face centre)
-  dkShape(ellipsePts(180, 1075, 90, 110, 0, 32), DK.blueD, { key: 'headhi', w: 0, line: false, amt: 0.18 });
-  // Tilaka (the forehead mark — a small vertical ellipse)
-  dkShape(ellipsePts(160, 1025, 10, 16, 0, 14), DK.gold, { key: 'tika', w: 0, raw: true, line: false });
+  ctx.restore();
+  // Face highlight (lighter inner oval on face centre)
+  dkShape(ellipsePts(180, 1078, 90, 110, 0, 32), DK.blueD, { key: 'headhi', w: 0, line: false, amt: 0.18 });
+  // Tilaka (forehead mark)
+  dkShape(ellipsePts(160, 1026, 10, 16, 0, 14), DK.gold, { key: 'tika', w: 0, raw: true, line: false });
   // Eye — almond-shaped, closed (reclining/sleeping)
   dkShape(ellipsePts(148, 1060, 48, 17, 0, 24), DK.ink, { key: 'eye', w: 0, raw: true, line: false });
   // Eye lower lid curve
@@ -994,7 +1083,7 @@ function sceneCosmic() {
     }
     ink(lidPts, { w: 4, color: DK.ink, key: 'lid' });
   }
-  // Eyebrow — curved arc
+  // Eyebrow
   {
     const browPts = [];
     for (let i = 0; i <= 12; i++) {
@@ -1003,34 +1092,43 @@ function sceneCosmic() {
     }
     ink(browPts, { w: 6, color: DK.ink, key: 'brow' });
   }
-  // Nose — small oval bump
+  // Nose — small oval
   dkShape(ellipsePts(120, 1092, 11, 16, 0, 16), DK.ink, { key: 'nose', w: 0, raw: true, line: false });
   // Ear
   dkShape(ellipsePts(245, 1100, 20, 34, 0, 20), DK.blueD, { key: 'ear', w: 3, amt: 0.2 });
   // Gold earring
-  dkShape(ellipsePts(245, 1125, 16, 22, 0, 18), DK.gold, { key: 'earing', w: 2, line: DK.goldD, amt: 0.15 });
+  dkShape(ellipsePts(245, 1126, 16, 22, 0, 18), DK.gold, { key: 'earing', w: 2, line: DK.goldD, amt: 0.15 });
 
-  // 10. Crown / kirita — tall smooth tapering shape (no triangle, uses petalPts)
-  dkShape(petalPts(195, 890, 195, 1000, 125, 28), DK.gold, { key: 'crown', w: 4, amt: 0.28 });
-  dkShape(petalPts(195, 920, 195, 998, 82, 24), DK.goldL, { key: 'crownL', w: 2, amt: 0.2, line: DK.goldD });
-  // Crown jewel
-  dkShape(ellipsePts(195, 906, 16, 22, 0, 16), DK.red, { key: 'jewel', w: 2, line: DK.goldD, amt: 0.15 });
+  // 11. Crown — multi-tier kirita with gradient petals (no sharp triangle)
+  ctx.save();
+  ctx.shadowColor = 'rgba(240,180,40,0.40)';
+  ctx.shadowBlur = 22;
+  dkShape(petalPts(195, 875, 195, 1008, 130, 28), DK.gold, { key: 'crown', w: 4, amt: 0.28 });
+  ctx.restore();
+  dkShape(petalPts(195, 902, 195, 998, 84, 24), DK.goldL, { key: 'crownM', w: 2, amt: 0.22, line: DK.goldD });
+  dkShape(petalPts(195, 930, 195, 992, 48, 20), DK.parchL, { key: 'crownI', w: 1.5, amt: 0.18, line: DK.goldD });
+  // Three crown jewels — apex + flanking
+  dkShape(ellipsePts(195, 884, 18, 25, 0, 18), DK.red, { key: 'jewel', w: 2, line: DK.goldD, amt: 0.15 });
+  dkShape(ellipsePts(165, 912, 11, 15, 0, 14), DK.lotus, { key: 'jewelL', w: 1.5, line: DK.goldD, amt: 0.12 });
+  dkShape(ellipsePts(225, 912, 11, 15, 0, 14), DK.lotus, { key: 'jewelR', w: 1.5, line: DK.goldD, amt: 0.12 });
 
-  // 11. Necklace on the figure
-  dkShape(ellipsePts(250, 1162, 72, 22, -0.28, 28), DK.gold, { key: 'nkl', w: 3, amt: 0.18, line: DK.goldD });
+  // 12. Necklace on the figure (layered)
+  dkShape(ellipsePts(250, 1160, 72, 22, -0.28, 28), DK.gold, { key: 'nkl1', w: 3, amt: 0.18, line: DK.goldD });
+  dkShape(ellipsePts(250, 1180, 82, 20, -0.22, 26), DK.goldL, { key: 'nkl2', w: 2, amt: 0.15, line: DK.goldD });
 
-  // 12. Two Kerala spiral coils at lower corners — foliage life detail
-  dkCoil(82, 1570, 82, 'coilBL');
-  dkCoil(998, 1570, 82, 'coilBR');
+  // 13. Two Kerala spiral coils at lower corners — foliage life detail
+  dkCoil(80, 1572, 84, 'coilBL');
+  dkCoil(1000, 1572, 84, 'coilBR');
 
-  // 13. Bottom petal row — the great lotus couch (Ananta/Shesha's lotus bed)
-  //     Large red petals pointing up from the very bottom of the frame
-  for (let i = 0; i < 9; i++) {
-    const px = 36 + i * 114;
-    // Outer petal (dark)
-    dkShape(petalPts(px, 1610, px, 1970, 102, 22), DK.redD, { key: 'bp' + i, w: 4, amt: 0.32 });
+  // 14. Bottom petal row — Ananta/Shesha's lotus couch (11 petals with gold sepal detail)
+  for (let i = 0; i < 11; i++) {
+    const px = 24 + i * 94;
+    // Outer petal (dark red)
+    dkShape(petalPts(px, 1608, px, 1972, 94, 22), DK.redD, { key: 'bp' + i, w: 4, amt: 0.32 });
     // Inner petal highlight
-    dkShape(petalPts(px, 1640, px, 1940, 64, 18), DK.red, { key: 'bpL' + i, w: 2, amt: 0.25 });
+    dkShape(petalPts(px, 1640, px, 1944, 58, 18), DK.red, { key: 'bpL' + i, w: 2, amt: 0.25 });
+    // Gold sepal detail at petal base — premium finish
+    dkShape(ellipsePts(px, 1958, 20, 12, 0, 14), DK.gold, { key: 'bps' + i, w: 1.5, line: DK.goldD, raw: true });
   }
 
   dkYearTag('cosmic');
@@ -1043,32 +1141,56 @@ function sceneGarden() {
   ctx.fillStyle = DK.parchment;
   ctx.fillRect(0, 0, W, H);
 
-  // 2. Teardrop border strips top and bottom
+  // 2. Warm radial glow behind the halo — gilded light emanating from the deity
+  const haloGrd = ctx.createRadialGradient(540, 480, 0, 540, 480, 320);
+  haloGrd.addColorStop(0,   'rgba(240,200,80,0.28)');
+  haloGrd.addColorStop(0.45,'rgba(240,170,40,0.10)');
+  haloGrd.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = haloGrd;
+  ctx.fillRect(0, 0, W, H);
+
+  // 3. Teardrop border strips top and bottom
   dkBorder(0, 95, DK.parchD, DK.gold, 'bdrT');
   dkBorder(H - 95, 95, DK.parchD, DK.gold, 'bdrB');
 
-  // 3. Spiral scrollwork background (Kerala ref 2 — green curling vines)
-  dkCoil(75, 230, 100, 'coilTL');
-  dkCoil(1005, 230, 100, 'coilTR');
-  dkCoil(52, 820, 72, 'coilML');
-  dkCoil(1028, 820, 72, 'coilMR');
-  // Extra small coils weaving around the composition
-  dkCoil(110, 550, 55, 'coilSL');
-  dkCoil(970, 550, 55, 'coilSR');
-  dkCoil(75, 1740, 90, 'coilBL');
-  dkCoil(1005, 1740, 90, 'coilBR');
+  // 4. Dense spiral scrollwork background — 16 positions fill the frame
+  dkCoil(62, 195, 110, 'coilTL');
+  dkCoil(1018, 195, 110, 'coilTR');
+  dkCoil(38, 598, 80, 'coilML1');
+  dkCoil(1042, 598, 80, 'coilMR1');
+  dkCoil(56, 968, 74, 'coilML2');
+  dkCoil(1024, 968, 74, 'coilMR2');
+  dkCoil(72, 1345, 70, 'coilBL1');
+  dkCoil(1008, 1345, 70, 'coilBR1');
+  dkCoil(72, 1645, 90, 'coilBL2');
+  dkCoil(1008, 1645, 90, 'coilBR2');
+  // Mid-density fill coils between primaries
+  dkCoil(162, 400, 56, 'coilTL2');
+  dkCoil(918, 400, 56, 'coilTR2');
+  dkCoil(160, 752, 50, 'coilML3');
+  dkCoil(920, 752, 50, 'coilMR3');
+  dkCoil(148, 1148, 54, 'coilBL3');
+  dkCoil(932, 1148, 54, 'coilBR3');
 
-  // 4. The halo — the bridge object (gold mandorla, centred upper third)
+  // 5. The halo — bridge object, gold mandorla centred upper third
+  ctx.save();
+  ctx.shadowColor = 'rgba(240,180,40,0.38)';
+  ctx.shadowBlur = 50;
   dkHalo(540, 480, 202, 'halo');
+  ctx.restore();
 
-  // 5. Two scroll clouds framing the deity's head
+  // 6. Two scroll clouds framing the deity's head
   dkCloud(162, 740, 115, 'cldGL');
   dkCloud(918, 740, 115, 'cldGR');
 
-  // 6. Deity — standing figure (all smooth ovals, no rectangles)
+  // 7. Deity figure — standing, all smooth ovals, no rectangles
 
-  // Head — blue oval
+  // Head — blue oval with glow
+  ctx.save();
+  ctx.shadowColor = 'rgba(74,128,184,0.38)';
+  ctx.shadowBlur = 18;
   dkShape(ellipsePts(540, 455, 90, 108, 0, 48), DK.blue, { key: 'dhead', w: 5, amt: 0.25 });
+  ctx.restore();
   // Face highlight
   dkShape(ellipsePts(530, 445, 54, 68, 0, 32), DK.blueD, { key: 'dheadhi', w: 0, line: false, amt: 0.15 });
   // Tilaka
@@ -1097,53 +1219,91 @@ function sceneGarden() {
   // Ears
   dkShape(ellipsePts(458, 458, 18, 30, 0, 18), DK.blueD, { key: 'dearL', w: 3, amt: 0.18 });
   dkShape(ellipsePts(622, 458, 18, 30, 0, 18), DK.blueD, { key: 'dearR', w: 3, amt: 0.18 });
-  // Gold earrings
-  dkShape(ellipsePts(458, 480, 14, 20, 0, 16), DK.gold, { key: 'dearrL', w: 2, line: DK.goldD, amt: 0.15 });
-  dkShape(ellipsePts(622, 480, 14, 20, 0, 16), DK.gold, { key: 'dearrR', w: 2, line: DK.goldD, amt: 0.15 });
+  // Gold earrings — layered for premium look
+  dkShape(ellipsePts(458, 480, 14, 20, 0, 16), DK.gold, { key: 'dearrL1', w: 2, line: DK.goldD, amt: 0.15 });
+  dkShape(ellipsePts(458, 495, 10, 10, 0, 14), DK.goldL, { key: 'dearrL2', w: 0, line: false, raw: true });
+  dkShape(ellipsePts(622, 480, 14, 20, 0, 16), DK.gold, { key: 'dearrR1', w: 2, line: DK.goldD, amt: 0.15 });
+  dkShape(ellipsePts(622, 495, 10, 10, 0, 14), DK.goldL, { key: 'dearrR2', w: 0, line: false, raw: true });
 
-  // Crown (kirita) — tall tapering petal shape, no sharp triangle
-  dkShape(petalPts(540, 270, 540, 370, 145, 32), DK.gold, { key: 'dcrown', w: 4, amt: 0.28 });
-  dkShape(petalPts(540, 300, 540, 368, 95, 28), DK.goldL, { key: 'dcrownL', w: 2, line: DK.goldD, amt: 0.2 });
-  // Crown jewels
-  dkShape(ellipsePts(540, 283, 18, 25, 0, 18), DK.red, { key: 'dcjewel', w: 2, line: DK.goldD, amt: 0.15 });
-  dkShape(ellipsePts(510, 308, 11, 15, 0, 14), DK.lotus, { key: 'dcj2', w: 1.5, line: DK.goldD, amt: 0.12 });
-  dkShape(ellipsePts(570, 308, 11, 15, 0, 14), DK.lotus, { key: 'dcj3', w: 1.5, line: DK.goldD, amt: 0.12 });
+  // 8. Crown — tall kirita with peacock feather accents (no sharp triangle)
+  ctx.save();
+  ctx.shadowColor = 'rgba(240,180,40,0.45)';
+  ctx.shadowBlur = 26;
+  dkShape(petalPts(540, 268, 540, 370, 148, 32), DK.gold, { key: 'dcrown', w: 4, amt: 0.28 });
+  ctx.restore();
+  dkShape(petalPts(540, 296, 540, 368, 98, 28), DK.goldL, { key: 'dcrownM', w: 2.5, line: DK.goldD, amt: 0.22 });
+  dkShape(petalPts(540, 322, 540, 366, 58, 24), DK.parchL, { key: 'dcrownI', w: 2, line: DK.goldD, amt: 0.18 });
+  // Crown jewels — apex + flanking pair
+  dkShape(ellipsePts(540, 278, 19, 26, 0, 18), DK.red, { key: 'dcjewel', w: 2, line: DK.goldD, amt: 0.15 });
+  dkShape(ellipsePts(508, 308, 12, 16, 0, 14), DK.lotus, { key: 'dcj2', w: 1.5, line: DK.goldD, amt: 0.12 });
+  dkShape(ellipsePts(572, 308, 12, 16, 0, 14), DK.lotus, { key: 'dcj3', w: 1.5, line: DK.goldD, amt: 0.12 });
+  // Peacock feather accents flanking the crown tip
+  dkShape(petalPts(504, 256, 524, 322, 26, 16), DK.green, { key: 'pfL', w: 2, amt: 0.28 });
+  dkShape(petalPts(576, 256, 556, 322, 26, 16), DK.green, { key: 'pfR', w: 2, amt: 0.28 });
+  dkShape(ellipsePts(504, 254, 10, 13, 0, 13), DK.blue, { key: 'pfLe', w: 0, line: false, raw: true });
+  dkShape(ellipsePts(576, 254, 10, 13, 0, 13), DK.blue, { key: 'pfRe', w: 0, line: false, raw: true });
 
-  // Torso — smooth blue oval (not a rectangle)
+  // 9. Torso and garment
+  ctx.save();
+  ctx.shadowColor = 'rgba(74,128,184,0.32)';
+  ctx.shadowBlur = 20;
   dkShape(ellipsePts(540, 700, 122, 208, 0, 48), DK.blue, { key: 'dtor', w: 5, amt: 0.25 });
-  // Saffron garment — oval draped over lower torso
+  ctx.restore();
+  // Saffron garment
   dkShape(ellipsePts(540, 850, 108, 145, 0, 40), DK.saffron, { key: 'dgar', w: 3.5, amt: 0.22 });
-  // Saffron drape tails (two smooth leaf shapes hanging down)
+  // Saffron drape tails
   dkShape(petalPts(480, 1010, 500, 875, 60, 18), DK.saffronL, { key: 'dgarL', w: 3, amt: 0.28 });
   dkShape(petalPts(600, 1010, 580, 875, 60, 18), DK.saffronL, { key: 'dgarR', w: 3, amt: 0.28 });
 
-  // Necklace (layered gold ovals)
-  dkShape(ellipsePts(540, 572, 78, 22, 0, 28), DK.gold, { key: 'dneck1', w: 3, amt: 0.18, line: DK.goldD });
-  dkShape(ellipsePts(540, 592, 88, 22, 0, 28), DK.goldL, { key: 'dneck2', w: 2.5, amt: 0.15, line: DK.goldD });
+  // 10. 3-layer necklace + chest ornament — premium ornamentation
+  dkShape(ellipsePts(540, 562, 80, 22, 0, 28), DK.gold, { key: 'dneck1', w: 3, amt: 0.18, line: DK.goldD });
+  dkShape(ellipsePts(540, 584, 90, 22, 0, 28), DK.goldL, { key: 'dneck2', w: 2.5, amt: 0.15, line: DK.goldD });
+  dkShape(ellipsePts(540, 608, 100, 22, 0, 32), DK.gold, { key: 'dneck3', w: 2, amt: 0.12, line: DK.goldD });
+  // Srivatsa chest ornament with glow
+  ctx.save();
+  ctx.shadowColor = 'rgba(240,180,40,0.50)';
+  ctx.shadowBlur = 18;
+  dkShape(ellipsePts(540, 648, 28, 28, 0, 24), DK.gold, { key: 'dchest', w: 2.5, line: DK.goldD, amt: 0.12 });
+  ctx.restore();
+  dkShape(ellipsePts(540, 648, 13, 13, 0, 16), DK.red, { key: 'dchestI', w: 0, line: false, raw: true });
 
-  // Two arms (smooth ovals angled out)
+  // 11. Belt ornament
+  dkShape(ellipsePts(540, 800, 130, 18, 0, 36), DK.gold, { key: 'dbelt', w: 3, amt: 0.15, line: DK.goldD });
+  dkShape(ellipsePts(540, 800, 22, 22, 0, 20), DK.goldL, { key: 'dbeltC', w: 2, line: DK.goldD, amt: 0.10 });
+
+  // 12. Two arms + two bangles each
   dkShape(ellipsePts(392, 615, 88, 28, -0.55, 28), DK.blue, { key: 'darmL', w: 4, amt: 0.25 });
   dkShape(ellipsePts(688, 615, 88, 28, 0.55, 28), DK.blue, { key: 'darmR', w: 4, amt: 0.25 });
-  // Arm bangles
-  dkShape(ellipsePts(358, 628, 22, 15, -0.3, 18), DK.gold, { key: 'dbanL', w: 2.5, line: DK.goldD, amt: 0.15 });
-  dkShape(ellipsePts(722, 628, 22, 15, 0.3, 18), DK.gold, { key: 'dbanR', w: 2.5, line: DK.goldD, amt: 0.15 });
+  // Left arm bangles (two)
+  dkShape(ellipsePts(356, 628, 22, 15, -0.3, 18), DK.gold, { key: 'dbanL1', w: 2.5, line: DK.goldD, amt: 0.15 });
+  dkShape(ellipsePts(340, 638, 20, 14, -0.25, 16), DK.goldL, { key: 'dbanL2', w: 2, line: DK.goldD, amt: 0.12 });
+  // Right arm bangles (two)
+  dkShape(ellipsePts(724, 628, 22, 15, 0.3, 18), DK.gold, { key: 'dbanR1', w: 2.5, line: DK.goldD, amt: 0.15 });
+  dkShape(ellipsePts(740, 638, 20, 14, 0.25, 16), DK.goldL, { key: 'dbanR2', w: 2, line: DK.goldD, amt: 0.12 });
 
-  // 7. Water and lotus pond in the lower half
-  // Water surface — smooth wide oval, not a hard rectangle
-  dkShape(ellipsePts(540, 1380, 600, 240, 0, 48), '#3060A0', { key: 'water', w: 0, line: false, amt: 0.12 });
+  // 13. Water and lotus pond in the lower half
+  dkShape(ellipsePts(540, 1380, 600, 240, 0, 48), '#2855A0', { key: 'water', w: 0, line: false, amt: 0.12 });
   // Water shimmer lines
   ctx.strokeStyle = 'rgba(160,200,255,0.28)'; ctx.lineWidth = 3;
   const RW = RNG('water');
   for (let i = 0; i < 8; i++) {
-    const wy = 1250 + i * 38 + RW.n(8);
+    const wy = 1252 + i * 38 + RW.n(8);
     ctx.beginPath(); ctx.moveTo(RW.r(0, 200), wy); ctx.lineTo(RW.r(800, W), wy); ctx.stroke();
   }
 
-  // Three lotus flowers on the water — hero + two companions
+  // Lily pads — premium botanical detail
+  dkShape(ellipsePts(205, 1328, 62, 28, 0.3, 24), DK.green, { key: 'pad1', w: 2.5, amt: 0.25 });
+  dkShape(ellipsePts(878, 1328, 62, 28, -0.3, 24), DK.green, { key: 'pad2', w: 2.5, amt: 0.25 });
+  dkShape(ellipsePts(385, 1358, 46, 22, 0.1, 20), DK.green, { key: 'pad3', w: 2, amt: 0.22 });
+  dkShape(ellipsePts(695, 1358, 46, 22, -0.1, 20), DK.green, { key: 'pad4', w: 2, amt: 0.22 });
+
+  // 14. Five lotus flowers on the water — centre + 2 companions + 2 edge
   const heroBloom = ev(TIMELINE.cues.bloom, 1.0);
   dkHero(540, 1240, 130, { key: 'hero', open: heroBloom, stem: true, c: DK.red, ci: DK.redL });
-  dkHero(230, 1310, 78, { key: 'lotL', open: ev(TIMELINE.cues.bloom + 0.3, 0.8), stem: true, c: DK.lotus, ci: DK.lotusD });
-  dkHero(850, 1310, 78, { key: 'lotR', open: ev(TIMELINE.cues.bloom + 0.5, 0.8), stem: true, c: DK.lotus, ci: DK.lotusD });
+  dkHero(248, 1312, 78, { key: 'lotL1', open: ev(TIMELINE.cues.bloom + 0.3, 0.8), stem: true, c: DK.lotus, ci: DK.lotusD });
+  dkHero(832, 1312, 78, { key: 'lotR1', open: ev(TIMELINE.cues.bloom + 0.5, 0.8), stem: true, c: DK.lotus, ci: DK.lotusD });
+  dkHero(118, 1382, 55, { key: 'lotL2', open: ev(TIMELINE.cues.bloom + 0.6, 0.7), stem: false, c: DK.red, ci: DK.redL });
+  dkHero(962, 1382, 55, { key: 'lotR2', open: ev(TIMELINE.cues.bloom + 0.7, 0.7), stem: false, c: DK.red, ci: DK.redL });
 
   dkYearTag('garden');
   dkCaption('the lotus opens');
